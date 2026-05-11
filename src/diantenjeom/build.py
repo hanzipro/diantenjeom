@@ -21,7 +21,7 @@ from pathlib import Path
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
-from diantenjeom import codepoints, rotate_quotes, vert_nudge
+from diantenjeom import codepoints, pin_locale, rotate_quotes, vert_nudge
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
@@ -130,6 +130,12 @@ def subset_one(variant: Variant) -> list[Path]:
     subsetter = Subsetter(options=opts)
     subsetter.populate(unicodes=set(variant.unicodes))
     subsetter.subset(font)
+
+    # Strip non-default LangSysRecord entries so every OT language tag
+    # (ZHT/ZHS/KOR/etc.) falls back to JAN-style vert wiring. Without this
+    # a page with `lang="zh-Hant"` would resolve to a vert feature record
+    # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
+    pin_locale.install(font)
 
     # Bake rotated copies of the Latin curly quotes and wire them into
     # vert/vrt2 — forces 90° CW rotation in vertical mode regardless of
