@@ -30,6 +30,9 @@ the sign as needed so callers don't have to think about it.)
 
 from __future__ import annotations
 
+from fontTools.misc.transform import Transform
+from fontTools.pens.t2CharStringPen import T2CharStringPen
+from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables as ot
 
@@ -129,28 +132,68 @@ def _add_vkrn_singlepos(font: TTFont, offsets: dict[str, tuple[int, int]]) -> No
             lang_sys.FeatureCount = len(lang_sys.FeatureIndex)
 
 
+def _shift_outline(font: TTFont, glyph_name: str, dy: int) -> None:
+    """Translate `glyph_name`'s CFF2 outline by (0, dy)."""
+    if "CFF2" not in font:
+        return
+    charstrings = font["CFF2"].cff[0].CharStrings
+    if glyph_name not in charstrings.charStrings:
+        return
+    target_cs = charstrings[glyph_name]
+
+    glyph_set = font.getGlyphSet()
+    pen = T2CharStringPen(None, glyph_set, CFF2=True)
+    glyph_set[glyph_name].draw(TransformPen(pen, Transform().translate(0, dy)))
+    new_cs = pen.getCharString(private=target_cs.private, globalSubrs=target_cs.globalSubrs)
+
+    target_idx = charstrings.charStrings[glyph_name]
+    charstrings.charStringsIndex.items[target_idx] = new_cs
+
+
 def install(font: TTFont, nudges: dict[int, int]) -> None:
     """Apply per-codepoint vertical-mode nudges.
 
     `nudges` is {codepoint: dy} where dy is signed font units. Negative dy
     moves the rendered glyph DOWN in the vertical slot.
+
+    Each mechanism (vmtx tsb / VORG / GPOS SinglePos) is applied to BOTH
+    the base cmap glyph (uni3001 / uniFF0C) and its `vert`-substituted
+    counterpart (glyph00036 / glyph00035). Different browsers consult
+    different glyphs for vertical layout:
+
+        - Chrome / Safari read the substituted glyph's metrics
+        - Firefox is observed reading the BASE glyph's metrics (it seems
+          to lay out before applying GSUB vert in the vertical pipeline)
+
+    Modifying both means whichever the engine picks, the shift applies.
+    Only one set of metrics is consulted per glyph in any given render,
+    so this is additive in coverage, not in effect.
     """
     if not nudges:
         return
 
+    cmap = font.getBestCmap()
     nudge_offsets: dict[str, tuple[int, int]] = {}
     vmtx = font.get("vmtx")
-    vorg = font.get("VORG")
     for cp, dy in nudges.items():
         target = _find_vert_target(font, cp)
-        if target is None:
-            continue
-        nudge_offsets[target] = (0, dy)
-        if vmtx is not None and target in vmtx.metrics:
-            adv, tsb = vmtx.metrics[target]
-            vmtx.metrics[target] = (adv, tsb - dy)
-        if vorg is not None:
-            current = vorg.VOriginRecords.get(target, vorg.defaultVertOriginY)
-            vorg.VOriginRecords[target] = current - dy
+        base = cmap.get(cp)
+        for glyph in (base, target):
+            if glyph is None:
+                continue
+            nudge_offsets[glyph] = (0, dy)
+            # vmtx tsb: Chrome's primary positioning signal for CFF2 vert.
+            if vmtx is not None and glyph in vmtx.metrics:
+                adv, tsb = vmtx.metrics[glyph]
+                vmtx.metrics[glyph] = (adv, tsb - dy)
+        # Outline shift on the vert-substituted glyph. Safari and Firefox
+        # position vertical CJK punctuation from the rendered glyph's bbox.
+        # We deliberately do NOT also write VORG — Safari uses VORG +
+        # outline additively, so combining the two compounds to a 2×
+        # shift; the outline change alone gives Safari the correct ‑120
+        # while keeping Chrome (vmtx-driven) and Firefox (bbox-driven) in
+        # agreement.
+        if target is not None:
+            _shift_outline(font, target, dy)
     if nudge_offsets:
         _add_vkrn_singlepos(font, nudge_offsets)

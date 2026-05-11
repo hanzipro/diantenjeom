@@ -117,9 +117,33 @@ def _add_rotated_glyph(font: TTFont, src_name: str, new_name: str) -> None:
 
     # hmtx: keep the same advance so an accidental horizontal use is sane.
     font["hmtx"].metrics[new_name] = (advance, 0)
-    # vmtx: vertical advance = original horizontal advance (tight footprint).
+
+    # Vertical metrics: Firefox seems to ignore tight vAdvance values for
+    # small CFF2 glyphs and uses an OS/2-derived slot (≈em), which makes a
+    # narrow `advance` reservation produce a huge gap before the previous
+    # character. Compromise: vAdvance = em / 2, glyph centred in that slot.
+    # Chrome / Safari follow vmtx so the slot is 500 wide; Firefox ends up
+    # close enough that the visual mismatch goes away.
+    v_advance = round(em * 0.4)
+    bp_new = BoundsPen(glyph_set)
+    glyph_set[src_name].draw(TransformPen(bp_new, t))
+    if bp_new.bounds is not None:
+        _, ny_min, _, ny_max = bp_new.bounds
+        outline_centre = (ny_min + ny_max) / 2
+        v_org = round(outline_centre + v_advance / 2)
+        tsb = v_org - round(ny_max)
+    else:
+        v_org = round(em * 0.5 + v_advance / 2)
+        tsb = 0
+
     if "vmtx" in font:
-        font["vmtx"].metrics[new_name] = (advance, 0)
+        font["vmtx"].metrics[new_name] = (v_advance, tsb)
+    # VORG: pin the per-glyph vertical origin so Safari / Firefox / HarfBuzz
+    # know where to place the slot top. Without an explicit entry they fall
+    # back to defaultVertOriginY (~880 in Noto CJK) which is far above our
+    # rotated outline, pushing the glyph into the gap between characters.
+    if "VORG" in font:
+        font["VORG"].VOriginRecords[new_name] = v_org
 
     # HVAR/VVAR maps every glyph → variation index. New glyphs need an entry,
     # otherwise compile fails. 0xFFFFFFFF = "no variation, use default" — the

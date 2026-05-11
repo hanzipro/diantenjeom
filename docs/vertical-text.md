@@ -10,35 +10,68 @@ and something breaks, start here.
 
 ## TL;DR cheat sheet
 
-| Behaviour                                  | Chrome   | Safari   | Firefox  | Fix                       |
-| ------------------------------------------ | -------- | -------- | -------- | ------------------------- |
-| Honours `vert` GSUB substitution           | ✓        | ✓ (via vrt2) | ✓    | universal                 |
-| Honours `vrt2` over `vert`                 | =        | prefers vrt2 | =    | alias both to JAN lookups |
-| Reads VORG for vertical glyph position     | ✗        | ✓        | ✓ (HB)   | also write vmtx tsb + GPOS|
-| Reads vmtx tsb for vertical glyph position | ✓        | =        | ✓        | (Chrome's main signal)    |
-| Reaches orphan feature records by tag      | ✗        | ✓ (CoreText) | ✓     | alias every record to JAN |
-| Applies orphan lookups by tag-walk         | ✗        | ✗        | ✓        | empty orphan mappings     |
-| Strictly applies UTR50 Tr → rotate         | ✗ (lax)  | ✗ (lax)  | ✓ (strict) | sentinel self-subst     |
+| Behaviour                                       | Chrome   | Safari   | Firefox    | Fix                          |
+| ----------------------------------------------- | -------- | -------- | ---------- | ---------------------------- |
+| Honours `vert` GSUB substitution                | ✓        | ✓ (via vrt2) | ✓      | universal                    |
+| Honours `vrt2` over `vert`                      | =        | prefers vrt2 | =      | alias both to JAN lookups    |
+| Reaches orphan feature records by tag           | ✗        | ✓ (CoreText) | ✓      | alias every record to JAN    |
+| Applies orphan lookups by tag-walk              | ✗        | ✗        | ✓          | empty orphan mappings        |
+| Strictly applies UTR50 Tr → rotate              | ✗ (lax)  | ✗ (lax)  | ✓ (strict) | sentinel self-subst          |
+| **Vertical-glyph position: reads vmtx `tsb`**   | ✓ primary | ✗       | ✗          | Chrome's only signal         |
+| **Vertical-glyph position: reads VORG**         | ✗        | ✓        | ✗          | Safari uses this — but compounds with outline (see below) |
+| **Vertical-glyph position: reads outline bbox** | ✗        | ✓ (additive) | ✓ primary | Safari + Firefox             |
+| Vertical font-side rotation: needs pre-rotated outline + `vert` subst | ✓ (vmtx for slot) | ✓ (VORG for slot) | ✓ (bbox for slot) | per-glyph VORG + vAdvance ≈ 0.4 em |
 
 ## The five quirks
 
 ### 1. CFF2 vertical positioning: Chrome ≠ Safari ≠ Firefox
 
 We wanted to nudge `、`(U+3001) and `，`(U+FF0C) a bit down in vertical
-mode because Noto JP's vert glyphs sit very tight to the top. Three font
-metadata knobs exist for this and **each browser listens to a different
-one**:
+mode because Noto JP's vert glyphs sit very tight to the top. After a
+long iteration we landed on **`vmtx tsb` + outline translation** as the
+combination that gives a single consistent shift across all three
+engines:
 
-- **vmtx `tsb`** (top side bearing) — Chrome's main signal for CFF2
-  vertical position. Raising tsb pushes the glyph down in the slot.
-- **VORG** (per-glyph vertical origin) — Safari / CoreText. Raising
-  VORG_y pushes the rendered glyph down.
-- **GPOS `SinglePos` under `vkrn`** — Firefox / HarfBuzz. Negative
-  yPlacement pushes the glyph down.
+- **Chrome** reads vmtx `tsb` (top side bearing). Raising tsb pushes the
+  glyph down. Chrome ignores VORG and outline-y for vertical CJK; it's
+  effectively a metric-only renderer.
+- **Safari** (CoreText) reads VORG *and* outline bbox. Both contribute
+  to position, so writing VORG **and** shifting the outline compounds
+  to a 2× shift — we therefore write only the outline shift on Safari's
+  behalf.
+- **Firefox** reads only the outline bbox. Neither vmtx nor VORG nor
+  GPOS SinglePos under `vkrn` had any effect during our tests.
 
-No single knob worked everywhere. `vert_nudge.install()` writes all
-three (consistent direction, sign-flipped where the OpenType convention
-disagrees with screen "down").
+So `vert_nudge.install()` does two things:
+
+1. Bump `vmtx tsb` by `|dy|` on both the base cmap glyph (`uni3001` /
+   `uniFF0C`) and the vert-substituted glyph (`glyph00036` /
+   `glyph00035`) — covers Chrome.
+2. Translate the vert-substituted glyph's CFF2 outline by `(0, dy)` —
+   covers Safari and Firefox.
+
+It deliberately does **NOT** write VORG or GPOS for these glyphs.
+VORG would compound with the outline shift in Safari (we saw 2× shift
+during iteration). GPOS yPlacement under `vkrn` had no observable
+effect in any of the three browsers for this case.
+
+**Sign convention exposed to callers:** a negative `dy` in
+`vert_nudge.JP` means "move the rendered glyph DOWN". The mechanism
+flips signs internally where the OpenType convention disagrees with
+screen "down" (vmtx tsb grows positive going down; outline-y grows
+negative going down — both end up consistent with the caller's sign).
+
+### 1b. Rotated curly quotes: a similar three-way disagreement
+
+The same browser split shows up for the pre-rotated Latin curly quotes
+(`rotate_quotes.py`): Chrome positions them from `vmtx`, Safari from
+VORG, Firefox from the outline bbox. We solve it by writing **both**
+`vmtx` and a per-glyph VORG that agree with each other (VORG = bbox
+y_max, tsb = 0), then setting `vAdvance ≈ 0.4 em` so Firefox's
+bbox-derived slot height is large enough not to crowd the previous
+character but small enough not to balloon the line spacing. The
+outline is already where it needs to be (centred in its em), so we
+don't translate it again.
 
 ### 2. Safari prefers `vrt2` over `vert`
 
