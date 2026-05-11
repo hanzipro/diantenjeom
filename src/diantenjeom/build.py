@@ -21,7 +21,7 @@ from pathlib import Path
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
-from diantenjeom import codepoints
+from diantenjeom import codepoints, rotate_quotes
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
@@ -124,6 +124,11 @@ def subset_one(variant: Variant) -> list[Path]:
     subsetter = Subsetter(options=opts)
     subsetter.populate(unicodes=set(variant.unicodes))
     subsetter.subset(font)
+
+    # Bake rotated copies of the Latin curly quotes and wire them into
+    # vert/vrt2 — forces 90° CW rotation in vertical mode regardless of
+    # the browser's run-segmentation heuristics. See rotate_quotes.py.
+    rotate_quotes.install(font)
 
     _rename_family(font, variant.family)
 

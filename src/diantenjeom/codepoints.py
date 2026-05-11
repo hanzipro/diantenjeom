@@ -24,6 +24,13 @@ JP: list[int] = [
     0x30FB,                  # 間隔號（片假名中點） ・
     0x300C, 0x300D,          # 引號 「」
     0x300E, 0x300F,          # 引號 『』
+    # 彎引號 — ja.html marks these as 不修正 (don't apply CJK conventions).
+    # Noto Sans CJK JP maps them to proportional Latin curly glyphs by
+    # default (~0.23–0.37 em). UTR50 classifies them as `R` (rotate) so by
+    # spec they should rotate 90° CW in vertical mode, but Chrome/Safari's
+    # run-segmentation lumps them with adjacent CJK and renders upright.
+    # `rotate_quotes.py` bakes pre-rotated glyphs + a `vert`/`vrt2`
+    # substitution to force the rotation regardless of run context.
     0x201C, 0x201D,          # 彎引號 “”
     0x2018, 0x2019,          # 彎引號 ‘’
     0x300A, 0x300B,          # 書名號 《》
