@@ -44,7 +44,9 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables as ot
 
-# Codepoints whose glyphs must be rotated 90° CW in vertical mode.
+# Codepoints whose glyphs must be rotated 90° CW in vertical mode. Latin
+# curly quotes behave the same regardless of CJK locale, so this set is
+# universal — JP / TC / SC / KR all use it as-is.
 ROTATE_QUOTES: tuple[int, ...] = (0x2018, 0x2019, 0x201C, 0x201D)
 
 
@@ -156,10 +158,13 @@ def _attach_vert_lookup(font: TTFont, mapping: dict[str, str]) -> None:
             fr.Feature.LookupCount = len(fr.Feature.LookupListIndex)
 
 
-def install(font: TTFont, codepoints: Iterable[int] = ROTATE_QUOTES) -> dict[str, str]:
-    """Add rotated alternates and `vert`/`vrt2` substitutions for `codepoints`.
-
-    Returns the {src_glyph: rotated_glyph} mapping that was installed.
+def install(
+    font: TTFont,
+    codepoints: Iterable[int] = ROTATE_QUOTES,
+) -> dict[str, str]:
+    """Bake pre-rotated alternates + `vert`/`vrt2` substitutions for each
+    codepoint in `codepoints`. Returns the {src: rotated} glyph mapping
+    that was installed.
     """
     cmap = font.getBestCmap()
     mapping: dict[str, str] = {}

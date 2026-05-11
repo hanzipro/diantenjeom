@@ -15,13 +15,13 @@ Current scope: Noto Sans JP only. Other locales/styles wired up later.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
-from diantenjeom import codepoints, rotate_quotes
+from diantenjeom import codepoints, rotate_quotes, vert_nudge
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
@@ -59,6 +59,12 @@ class Variant:
     style: str    # "sans" | "serif"
     source: Path
     unicodes: list[int]
+    # Codepoints to force-rotate 90° CW in vertical mode (Latin curly
+    # quotes are universal; CJK locales share this set).
+    rotate_quotes: tuple[int, ...] = rotate_quotes.ROTATE_QUOTES
+    # Per-codepoint vertical-mode y nudges for vert-substituted glyphs.
+    # Different locales position 、，等 differently — pass the right dict.
+    vert_nudges: dict[int, int] = field(default_factory=dict)
 
     @property
     def stem(self) -> str:
@@ -128,7 +134,9 @@ def subset_one(variant: Variant) -> list[Path]:
     # Bake rotated copies of the Latin curly quotes and wire them into
     # vert/vrt2 — forces 90° CW rotation in vertical mode regardless of
     # the browser's run-segmentation heuristics. See rotate_quotes.py.
-    rotate_quotes.install(font)
+    rotate_quotes.install(font, variant.rotate_quotes)
+    # Apply per-codepoint vertical-mode nudges (vmtx tsb + VORG + GPOS).
+    vert_nudge.install(font, variant.vert_nudges)
 
     _rename_family(font, variant.family)
 
@@ -197,6 +205,7 @@ def main() -> None:
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.JP,
+            vert_nudges=vert_nudge.JP,
         ),
     ]
 
