@@ -21,7 +21,7 @@ from pathlib import Path
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
-from diantenjeom import codepoints, pin_locale, rotate_quotes, vert_nudge
+from diantenjeom import codepoints, ellipsis_pair, pin_locale, rotate_quotes, vert_nudge
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
@@ -146,6 +146,16 @@ def subset_one(variant: Variant) -> list[Path]:
     rotate_quotes.install(font, variant.rotate_configs)
     # Apply per-codepoint vertical-mode nudges (vmtx tsb + VORG + GPOS).
     vert_nudge.install(font, variant.vert_nudges)
+    # Split single vs paired U+2026 ellipsis: single → Latin-low form,
+    # double → CJK-centred form (current behaviour).
+    ellipsis_pair.install(font)
+
+    # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
+    # leaves stale bits behind — bit 31 (General Punctuation, where U+2026
+    # / U+2014 / U+201x live) was unset, which made Firefox skip our font
+    # for those codepoints inside mixed-script runs and fall back to the
+    # next CJK font in the CSS stack.
+    font["OS/2"].recalcUnicodeRanges(font)
 
     _rename_family(font, variant.family)
 

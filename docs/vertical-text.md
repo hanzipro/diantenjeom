@@ -170,6 +170,54 @@ curl -s http://localhost:3000/dist/fonts/diantenjeom-sans-jp.woff2 | shasum -a 2
 If those two hashes differ, fix the server before chasing rendering
 ghosts.
 
+## Open issue: ellipsis in Firefox vertical Latin runs
+
+After splitting `…` (U+2026) into Latin-low (single) and CJK-centred
+(paired), Chrome and Safari render both cases correctly in horizontal
+**and** vertical writing mode. Firefox renders the horizontal case
+correctly, but in a **rotated Latin run inside `writing-mode:
+vertical-rl`** the single ellipsis floats noticeably higher than the
+adjacent period or the run's Latin baseline.
+
+**What works in Chrome / Safari:**
+- `cmap[U+2026]` → `ellipsis` with the outline shifted down so dots
+  sit at y=0–100 (Latin baseline level).
+- Existing `vert` substitution retargeted from `ellipsis → glyph00042`
+  onto a sibling `ellipsis.cjk` so single ellipsis in vertical does
+  not become the CJK vertical stack.
+- GSUB Chain Context Substitution under `calt` AND `liga` (Safari
+  needs `liga`; CoreText silently ignores chain contexts whose input
+  positions share one Coverage object, so the two positions get
+  separate Coverage instances): when `ellipsis ellipsis` appears,
+  substitute both with `ellipsis.cjk`.
+
+**What didn't move Firefox** (any of these, individually or together):
+
+1. Setting OS/2 `ulUnicodeRange1` bit 31 (General Punctuation) so the
+   font advertises coverage of U+2026.
+2. Adding a `vert` sentinel self-substitution (`ellipsis → ellipsis`),
+   which fixed `;` for strict UTR50; doesn't help here.
+3. Modifying the outline in place rather than creating a new glyph and
+   re-pointing cmap — keeps the glyph ID stable so HVAR / VVAR
+   variation maps stay consistent.
+
+The font's BASE table declares `romn` (Roman) at y=120 for Latin script
+and `ideo` (ideographic) at y=0 for CJK scripts on the vertical axis.
+Firefox seems to align the Common-script ellipsis to a baseline that
+doesn't match `romn` even though it's inside an explicit Latin run.
+
+**Worth trying next:**
+
+- Compare BASE / OS/2 metrics of Helvetica and Arial against ours —
+  those fonts apparently render U+2026 correctly in this scenario, so
+  whatever metric drives Firefox's baseline choice for Common-script
+  characters must differ.
+- Try removing the BASE table entirely and see whether Firefox falls
+  back to bbox-based positioning.
+- Provide an explicit `vert` substitution to a glyph whose outline is
+  pre-positioned for vertical-Latin-baseline placement (might just
+  trade one Firefox quirk for another, but worth a shot).
+
 ## Open issue: dash alignment
 
 `—` (U+2014, em-dash) and `⸺` (U+2E3A, two-em dash) render slightly
