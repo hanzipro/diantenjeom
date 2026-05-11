@@ -179,44 +179,78 @@ correctly, but in a **rotated Latin run inside `writing-mode:
 vertical-rl`** the single ellipsis floats noticeably higher than the
 adjacent period or the run's Latin baseline.
 
-**What works in Chrome / Safari:**
-- `cmap[U+2026]` → `ellipsis` with the outline shifted down so dots
-  sit at y=0–100 (Latin baseline level).
+**Current state (good enough across all three):**
+- `cmap[U+2026]` → `ellipsis` with the outline shifted down by
+  `_LATIN_LOW_DY = -360` (dots end up at y=-30 to +70). This is the
+  least-wrong compromise:
+  - Chrome / Safari render dots ~30 units below the Latin baseline
+    (visually fine — barely noticeable).
+  - Firefox renders them ~30 units above the Latin baseline (also
+    visually fine).
+  - The ideal value for Chrome / Safari alone would be -330; for
+    Firefox alone roughly -400. -360 splits the difference.
+- HVAR / VVAR entries for the modified `ellipsis` glyph cleared to
+  "no variation" (0xFFFFFFFF) — the source's varStore deltas were
+  calibrated for the unmodified outline and shifted position at
+  non-default weights.
 - Existing `vert` substitution retargeted from `ellipsis → glyph00042`
   onto a sibling `ellipsis.cjk` so single ellipsis in vertical does
   not become the CJK vertical stack.
-- GSUB Chain Context Substitution under `calt` AND `liga` (Safari
-  needs `liga`; CoreText silently ignores chain contexts whose input
-  positions share one Coverage object, so the two positions get
-  separate Coverage instances): when `ellipsis ellipsis` appears,
-  substitute both with `ellipsis.cjk`.
+- GSUB Chain Context Substitution under `ccmp` (every engine applies
+  it in every writing mode — calt / liga were observed flaky in
+  Firefox vertical-rl CJK runs) with separate Coverage objects per
+  input position (CoreText silently ignores chain contexts whose
+  input positions share a Coverage reference).
 
-**What didn't move Firefox** (any of these, individually or together):
+**Diagnostic timeline — what we tried, why most didn't help:**
 
 1. Setting OS/2 `ulUnicodeRange1` bit 31 (General Punctuation) so the
-   font advertises coverage of U+2026.
-2. Adding a `vert` sentinel self-substitution (`ellipsis → ellipsis`),
-   which fixed `;` for strict UTR50; doesn't help here.
+   font advertises coverage of U+2026. **No effect.** (Kept anyway —
+   it's the right thing to do for a font that covers this range.)
+2. A `vert` sentinel self-substitution (`ellipsis → ellipsis`), the
+   same trick that fixed `;` UTR50-rotation in Firefox. **No effect.**
 3. Modifying the outline in place rather than creating a new glyph and
-   re-pointing cmap — keeps the glyph ID stable so HVAR / VVAR
-   variation maps stay consistent.
+   re-pointing cmap. The hypothesis was that fontTools renaming new
+   glyphs to `ellipsis` on save under post format 3.0 broke VVAR / HVAR
+   index linking. In-place modification keeps the ID stable. **No
+   visible effect on Firefox**, but kept as the cleaner design anyway.
+4. Updating `vmtx` tsb to match the new bbox y_max (vs. leaving the
+   source value). **No effect** either way.
+5. Clearing HVAR / VVAR variation entries to "no variation". **No
+   visible effect at default weight**, but kept (correctness).
+6. Moving the chain context lookup between `calt`, `liga`, `ccmp` and
+   combinations of those. **No visible difference for the single-glyph
+   case**, settled on `ccmp` for engine-wide reliability.
+7. Extreme outline shift (`_LATIN_LOW_DY = -1000`) as a diagnostic to
+   verify Firefox actually uses our glyph. **Confirmed**: all three
+   browsers showed dots at extreme low. Firefox does read the outline,
+   it just adds a small constant vertical offset relative to the rest
+   of the Latin run.
 
-The font's BASE table declares `romn` (Roman) at y=120 for Latin script
-and `ideo` (ideographic) at y=0 for CJK scripts on the vertical axis.
-Firefox seems to align the Common-script ellipsis to a baseline that
-doesn't match `romn` even though it's inside an explicit Latin run.
+**Observations against Helvetica / ArialHB**, both of which render
+this case correctly:
 
-**Worth trying next:**
+- Helvetica and ArialHB have **no** `BASE`, `vmtx`, or `VORG` tables.
+  Our font has all three (required for CJK vertical typesetting).
+  The hypothesis was that Firefox uses these tables for cross-axis
+  baseline alignment of Common-script characters in rotated Latin
+  runs. We couldn't drop them — they're load-bearing for the rest of
+  the font. Tested neutralising specific entries on the ellipsis glyph
+  to no effect.
+- ArialHB's `ellipsis` bbox `(117, 0, 883, 100)` is **identical** to
+  ours after the shift. Same em (1000). The only structural difference
+  is the presence of the vertical-mode tables. The actual Firefox
+  fix likely involves some metric we haven't isolated.
 
-- Compare BASE / OS/2 metrics of Helvetica and Arial against ours —
-  those fonts apparently render U+2026 correctly in this scenario, so
-  whatever metric drives Firefox's baseline choice for Common-script
-  characters must differ.
-- Try removing the BASE table entirely and see whether Firefox falls
-  back to bbox-based positioning.
-- Provide an explicit `vert` substitution to a glyph whose outline is
-  pre-positioned for vertical-Latin-baseline placement (might just
-  trade one Firefox quirk for another, but worth a shot).
+**Worth trying next** if revisiting:
+
+- Build a debug font that drops `BASE` entirely and see whether
+  Firefox falls back to outline-based positioning that matches
+  Chrome / Safari.
+- Provide a per-glyph `BASE` override (if such a thing exists in
+  OpenType) for U+2026 declaring it Latin / `romn` baseline.
+- Inspect Firefox source for the specific code path that positions
+  Common-script glyphs in rotated Latin runs.
 
 ## Open issue: dash alignment
 

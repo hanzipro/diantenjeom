@@ -43,18 +43,17 @@ change. More docs and examples to come.
 
 [fla]: https://developer.mozilla.org/en-US/docs/Web/CSS/font-language-override
 
-- **Latin-low ellipsis (`…`) sits too high in Firefox inside a rotated
-  Latin run in vertical mode.** In Chrome and Safari `…` correctly
-  rests on the Latin baseline of the rotated run; in Firefox it floats
-  above where periods sit. Horizontal Firefox renders it correctly, so
-  it's a vertical-rotated-Latin-run-specific baseline-alignment quirk.
-  Things we tried (and they didn't move the needle): OS/2 Unicode Range
-  bit for U+2026, a `vert` sentinel self-substitution, modifying the
-  glyph outline in place to keep the glyph ID stable so VVAR / HVAR
-  variation maps stay consistent. Helvetica / Arial render this case
-  correctly per anecdotal report — worth diffing their BASE / OS/2
-  metrics against ours next. See `docs/vertical-text.md` § "Ellipsis
-  in Firefox vertical Latin runs".
+- **Latin-low ellipsis (`…`) sits slightly above the Latin baseline in
+  Firefox inside a rotated Latin run.** Chrome and Safari place it on
+  the baseline; Firefox places it ~50–80 font units higher (close
+  enough but not perfect). Horizontal mode is identical across all
+  three browsers, so this is a vertical-rotated-Latin-run-specific
+  baseline-alignment quirk Firefox applies to U+2026 specifically. We
+  picked `_LATIN_LOW_DY = -360` (vs the ideal -330 for Chrome / Safari)
+  as the least-wrong compromise; revisit if Firefox's vertical text
+  baseline handling for Common-script changes. See
+  `docs/vertical-text.md` § "Ellipsis in Firefox vertical Latin runs"
+  for the diagnostic timeline.
 
 - **Align em-dash and 2-em-dash with the line's centre axis in vertical
   mode.** Both `—` (U+2014) and `⸺` (U+2E3A) currently render slightly

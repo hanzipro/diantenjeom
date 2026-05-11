@@ -11,28 +11,33 @@ How it works
 1. Copy the source `ellipsis` outline into a new sibling glyph
    `ellipsis.cjk` — preserves the CJK-middle form for the paired case.
 2. Modify the original `ellipsis` glyph in place: translate its outline
-   down to baseline level. The glyph keeps its existing glyph ID and
-   cmap mapping (U+2026 still resolves to `ellipsis`), so every metric
-   table (hmtx LSB, vmtx tsb, HVAR / VVAR variation maps) automatically
-   stays consistent with the new outline — no rename gymnastics from
-   fontTools on save, no metric/outline mismatch that confuses Firefox.
-3. Retarget the existing `vert` substitution (originally
+   down by `_LATIN_LOW_DY`. Keeping the same glyph ID means every
+   metric table (hmtx LSB, vmtx, HVAR / VVAR) keeps referencing the
+   same id, no rename gymnastics from fontTools on save.
+3. Clear HVAR / VVAR entries on the modified glyph (set to
+   "no variation"). The source's varStore deltas were calibrated for
+   the original outline; applying them to the shifted outline shifts
+   position at non-default weights.
+4. Retarget the existing `vert` substitution (originally
    `ellipsis → glyph00042`) to fire on `ellipsis.cjk` instead, so single
    ellipsis in vertical mode no longer maps to the CJK vertical stack.
-4. Add a Chain Context Substitution under `calt` AND `liga`: when
+5. Add a Chain Context Substitution (GSUB Type 6) under `ccmp`: when
    `ellipsis` is followed by another `ellipsis`, substitute both with
-   `ellipsis.cjk`. Safari needs `liga` (CoreText sometimes skips calt
-   in CJK runs) and separate Coverage objects for the two input
-   positions (a single shared Coverage reference is silently ignored).
+   `ellipsis.cjk`. We use `ccmp` because every shaping engine applies
+   it in every writing mode (calt and liga were observed flaky for
+   CJK runs in Firefox vertical-rl). The two input positions get
+   separate Coverage objects — Safari/CoreText silently ignores a
+   chain context whose input positions share one Coverage reference.
 
-Vertical mode emerges for free:
-    - Single `…` has no `vert` substitution any more (we moved it onto
-      `ellipsis.cjk`), so the browser auto-rotates it per UTR50 R-class.
-      Dots at the LEFT side of the line — the vertical equivalent of
-      Latin baseline placement.
+Vertical mode mostly emerges for free:
     - Paired `……` → ellipsis.cjk × 2 → (vert subst) glyph00042 × 2 →
       six dots stacked vertically on the line centre. Identical to the
       previous vertical behaviour for `……`.
+    - Single `…` has no `vert` substitution any more, so the browser
+      auto-rotates / positions it per its own logic. Chrome and Safari
+      place it on the Latin baseline; Firefox places it slightly higher
+      (within a rotated Latin run) — `_LATIN_LOW_DY = -360` is the
+      compromise that's least-wrong across all three.
 """
 
 from __future__ import annotations
@@ -47,7 +52,7 @@ from fontTools.ttLib.tables import otTables as ot
 # Distance (font units) by which to translate the ellipsis outline
 # downward. Source dots sit at y ~ 330-430 (em*0.4 centre); shifting by
 # -330 puts them at y ~ 0-100, resting on the Latin baseline.
-_LATIN_LOW_DY: int = -330
+_LATIN_LOW_DY: int = -360
 
 # Codepoint we're switching.
 _CP: int = 0x2026
@@ -70,6 +75,7 @@ def install(font: TTFont) -> None:
     #    keeps referring to the right thing automatically, and fontTools
     #    won't need to rename anything on save under post format 3.0.
     _shift_glyph_outline_in_place(font, src_name, dy=_LATIN_LOW_DY)
+    _clear_variation_entries(font, src_name)
 
     # 3. Retarget the existing `ellipsis → glyph00042` vertical
     #    substitution to use the new CJK-middle copy instead, so single
@@ -79,14 +85,6 @@ def install(font: TTFont) -> None:
 
     # 4. Pair chain context: ellipsis ellipsis → ellipsis.cjk ellipsis.cjk
     _add_pair_chain_context(font, find=src_name, replace=cjk_name)
-
-    # 5. Sentinel `vert` substitution: ellipsis → ellipsis (self). Firefox
-    #    applies UTR50 R rotation to U+2026 even inside an already-rotated
-    #    Latin run, which double-rotates the glyph (180° total = dots
-    #    flip to the top). A self-substitution under `vert` signals
-    #    "this glyph has explicit vert handling — don't auto-rotate",
-    #    which makes Firefox respect the run's rotation only.
-    _add_vert_sentinel(font, src_name)
 
 
 def _add_translated_glyph(
@@ -144,6 +142,20 @@ def _add_translated_glyph(
                 vmap.mapping[new_name] = _no_var
 
 
+def _clear_variation_entries(font: TTFont, glyph_name: str) -> None:
+    """Set HVAR/VVAR entries for `glyph_name` to 'no variation' (0xFFFFFFFF).
+    Otherwise the source's varStore deltas keep getting applied to the
+    modified outline, shifting position at non-default weights."""
+    _no_var = 0xFFFFFFFF
+    for tag in ("HVAR", "VVAR"):
+        if tag not in font:
+            continue
+        for attr in ("AdvWidthMap", "LsbMap", "RsbMap", "AdvHeightMap", "TsbMap", "BsbMap", "VOrgMap"):
+            vmap = getattr(font[tag].table, attr, None)
+            if vmap is not None and hasattr(vmap, "mapping"):
+                vmap.mapping[glyph_name] = _no_var
+
+
 def _shift_glyph_outline_in_place(font: TTFont, glyph_name: str, dy: int) -> None:
     """Translate `glyph_name`'s CFF2 outline by (0, dy) and update vmtx
     tsb to stay consistent with the new bbox top."""
@@ -161,12 +173,9 @@ def _shift_glyph_outline_in_place(font: TTFont, glyph_name: str, dy: int) -> Non
 
     idx = charstrings.charStrings[glyph_name]
     charstrings.charStringsIndex.items[idx] = new_cs
-
-    # vmtx tsb = VORG_y − bbox_y_max. Outline moved by dy, so y_max moves
-    # by dy too, and tsb compensates by −dy.
-    if "vmtx" in font and glyph_name in font["vmtx"].metrics:
-        adv, tsb = font["vmtx"].metrics[glyph_name]
-        font["vmtx"].metrics[glyph_name] = (adv, tsb - dy)
+    # vmtx tsb intentionally left at the source value (no recompute).
+    # Tested both ways: tsb tracking the new bbox vs. left as-is made no
+    # difference to Firefox's baseline placement in rotated Latin runs.
 
 
 def _retarget_vert_subst(font: TTFont, old_src: str, new_src: str) -> None:
@@ -238,41 +247,12 @@ def _add_pair_chain_context(font: TTFont, find: str, replace: str) -> None:
     gsub.LookupList.Lookup.append(chain_lookup)
     gsub.LookupList.LookupCount = len(gsub.LookupList.Lookup)
 
-    # Attach to BOTH calt and liga — Safari/CoreText is less reliable
-    # about calt for CJK runs but processes liga more aggressively.
-    _attach_to_feature(gsub, "calt", chain_idx)
-    _attach_to_feature(gsub, "liga", chain_idx)
-
-
-def _add_vert_sentinel(font: TTFont, glyph_name: str) -> None:
-    """Extend an existing JAN-referenced vert SingleSubst lookup with a
-    self-substitution `glyph_name → glyph_name`, signalling to UTR50-strict
-    engines that this glyph has font-side vert handling."""
-    gsub = font["GSUB"].table
-    # Find DefaultLangSys's vert feature's first SingleSubst lookup.
-    feature_list = gsub.FeatureList.FeatureRecord
-    jan_vert_lookups = None
-    for sr in gsub.ScriptList.ScriptRecord:
-        ds = sr.Script.DefaultLangSys
-        if ds is None:
-            continue
-        for fi in ds.FeatureIndex:
-            if feature_list[fi].FeatureTag == "vert":
-                jan_vert_lookups = feature_list[fi].Feature.LookupListIndex
-                break
-        if jan_vert_lookups:
-            break
-    if not jan_vert_lookups:
-        return
-    for li in jan_vert_lookups:
-        lookup = gsub.LookupList.Lookup[li]
-        if lookup.LookupType != 1:
-            continue
-        for st in lookup.SubTable:
-            if hasattr(st, "mapping"):
-                if glyph_name not in st.mapping:
-                    st.mapping[glyph_name] = glyph_name
-                return
+    # Attach to ccmp (Glyph Composition/Decomposition). ccmp is in the
+    # "required" feature set — every shaping engine applies it on every
+    # script in every writing mode. calt/liga are nominally always-on but
+    # some engines (Firefox observed) skip them for CJK runs in vertical
+    # writing mode. Putting our chain context in ccmp avoids the issue.
+    _attach_to_feature(gsub, "ccmp", chain_idx)
 
 
 def _attach_to_feature(table, tag: str, lookup_idx: int) -> None:
