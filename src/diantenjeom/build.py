@@ -1,10 +1,15 @@
 """Extract CJK punctuation glyphs from Noto Sans/Serif CJK.
 
 Pipeline:
-    1. Load a source Noto CJK font (.otf / .ttc).
-    2. Subset to the punctuation codepoint set per locale (zh-Hans, zh-Hant, ja, ko).
-    3. Emit OTF (desktop: InDesign, apps) and WOFF2 (web) to dist/.
-    4. Generate a sample @font-face CSS — convenience for web users; ignore otherwise.
+    1. Load a source Noto CJK variable font.
+    2. Subset to the per-locale punctuation codepoint set (see `codepoints.py`).
+    3. Keep GSUB/GPOS layout features so vertical typesetting (`vert`, `vrt2`)
+       and CSS punctuation-squeezing (`palt`, `vpal`, `halt`, `vhal`) survive.
+    4. Rewrite the name table so the OTF doesn't shadow installed Noto CJK.
+    5. Emit OTF (desktop: InDesign, apps) and WOFF2 (web) to dist/.
+    6. Generate a sample @font-face CSS.
+
+Current scope: Noto Sans JP only. Other locales/styles wired up later.
 """
 
 from __future__ import annotations
@@ -16,17 +21,24 @@ from pathlib import Path
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
+from diantenjeom import codepoints
+
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
 FONTS_OUT = DIST / "fonts"
 
-# CJK punctuation blocks. Refine per-locale as the project matures.
-PUNCT_RANGES: list[tuple[int, int]] = [
-    (0x2000, 0x206F),  # General Punctuation (—, …, etc.)
-    (0x3000, 0x303F),  # CJK Symbols and Punctuation (、。「」《》etc.)
-    (0xFF00, 0xFFEF),  # Halfwidth and Fullwidth Forms
-    (0xFE30, 0xFE4F),  # CJK Compatibility Forms (vertical punctuation)
-    (0xFE10, 0xFE1F),  # Vertical Forms
+# Layout features to retain. Closure under these tags pulls in the alternate
+# glyphs they reference (vertical forms, half/proportional widths, kerning).
+KEEP_FEATURES = [
+    # GSUB — shape substitution
+    "ccmp", "locl", "calt", "rlig",
+    "vert", "vrt2",          # vertical alternates
+    "fwid", "hwid", "pwid",  # width variants
+    # GPOS — positioning / squeezing
+    "kern", "vkrn",
+    "palt", "vpal",          # proportional alternate metrics (CSS "palt")
+    "halt", "vhal",          # half-width alternate metrics
+    "mark", "mkmk",
 ]
 
 
@@ -34,59 +46,121 @@ PUNCT_RANGES: list[tuple[int, int]] = [
 class Variant:
     locale: str   # "sc" | "tc" | "jp" | "kr"
     style: str    # "sans" | "serif"
-    source: Path  # path to source .otf/.ttc
-    ttc_index: int | None = None
+    source: Path
+    unicodes: list[int]
+
+    @property
+    def stem(self) -> str:
+        return f"diantenjeom-{self.style}-{self.locale}"
+
+    @property
+    def family(self) -> str:
+        return f"Diantenjeom {self.style.title()} {self.locale.upper()}"
 
 
-def codepoints() -> set[int]:
-    return {cp for lo, hi in PUNCT_RANGES for cp in range(lo, hi + 1)}
+def _rename_family(font: TTFont, family: str) -> None:
+    """Replace family/full/postscript/preferred-family names.
+
+    Without this, the subset still identifies itself as the source font
+    and collides with an installed Noto CJK at the OS font-management level.
+    """
+    name = font["name"]
+    postscript = family.replace(" ", "")
+    full = family
+
+    # (nameID, value) pairs we overwrite for every (platform, encoding, language)
+    # tuple already present in the name table for that ID.
+    payloads = {
+        1: family,        # Family
+        4: full,          # Full name
+        6: postscript,    # PostScript name
+        16: family,       # Typographic family
+        21: family,       # WWS family
+    }
+    # Collect existing (platformID, platEncID, langID) sets per nameID so we
+    # only write into slots the source already populated — avoids inventing
+    # records for platforms the font never targeted.
+    slots: dict[int, set[tuple[int, int, int]]] = {}
+    for rec in name.names:
+        slots.setdefault(rec.nameID, set()).add((rec.platformID, rec.platEncID, rec.langID))
+
+    for nid, value in payloads.items():
+        # If the source didn't have this ID at all, seed the standard slots.
+        existing = slots.get(nid) or {(3, 1, 0x409), (1, 0, 0)}
+        for plat, enc, lang in existing:
+            name.setName(value, nid, plat, enc, lang)
 
 
 def subset_one(variant: Variant) -> list[Path]:
-    font = (
-        TTFont(variant.source, fontNumber=variant.ttc_index)
-        if variant.ttc_index is not None
-        else TTFont(variant.source)
-    )
+    font = TTFont(variant.source)
 
     opts = Options()
-    opts.desubroutinize = True
-    opts.drop_tables += ["GSUB", "GPOS"]  # punctuation rarely needs shaping
+    opts.layout_features = KEEP_FEATURES
+    opts.name_IDs = ["*"]
+    opts.name_legacy = True
+    opts.name_languages = ["*"]
+    opts.glyph_names = True
+    opts.legacy_kern = True
+    opts.notdef_outline = True
+    opts.recommended_glyphs = True
+    opts.recalc_bounds = True
+    opts.recalc_timestamp = False
+    opts.canonical_order = True
+    opts.drop_tables.remove("DSIG") if "DSIG" in opts.drop_tables else None
+    # Keep VORG/vhea/vmtx/VVAR — vertical metrics tables are essential for
+    # `writing-mode: vertical-rl`.
 
     subsetter = Subsetter(options=opts)
-    subsetter.populate(unicodes=codepoints())
+    subsetter.populate(unicodes=set(variant.unicodes))
     subsetter.subset(font)
 
-    FONTS_OUT.mkdir(parents=True, exist_ok=True)
-    stem = f"diantenjeom-{variant.style}-{variant.locale}"
+    _rename_family(font, variant.family)
 
-    otf_path = FONTS_OUT / f"{stem}.otf"
+    FONTS_OUT.mkdir(parents=True, exist_ok=True)
+
+    otf_path = FONTS_OUT / f"{variant.stem}.otf"
     font.flavor = None
     font.save(otf_path)
 
-    woff2_path = FONTS_OUT / f"{stem}.woff2"
+    woff2_path = FONTS_OUT / f"{variant.stem}.woff2"
     font.flavor = "woff2"
     font.save(woff2_path)
 
     return [otf_path, woff2_path]
 
 
+def _unicode_range(unicodes: list[int]) -> str:
+    """Build a compact CSS `unicode-range` value, collapsing runs."""
+    sorted_cps = sorted(set(unicodes))
+    parts: list[str] = []
+    run_start = run_end = sorted_cps[0]
+    for cp in sorted_cps[1:]:
+        if cp == run_end + 1:
+            run_end = cp
+        else:
+            parts.append(f"U+{run_start:04X}" if run_start == run_end
+                         else f"U+{run_start:04X}-{run_end:04X}")
+            run_start = run_end = cp
+    parts.append(f"U+{run_start:04X}" if run_start == run_end
+                 else f"U+{run_start:04X}-{run_end:04X}")
+    return ", ".join(parts)
+
+
 def write_css(variants: list[Variant]) -> Path:
-    lines: list[str] = []
+    blocks: list[str] = []
     for v in variants:
-        family = f"Diantenjeom {v.style.title()} {v.locale.upper()}"
-        url = f"./fonts/diantenjeom-{v.style}-{v.locale}.woff2"
-        lines.append(
+        url = f"./fonts/{v.stem}.woff2"
+        blocks.append(
             "@font-face {\n"
-            f"  font-family: '{family}';\n"
-            f"  src: url('{url}') format('woff2');\n"
+            f"  font-family: '{v.family}';\n"
+            f"  src: url('{url}') format('woff2-variations');\n"
+            "  font-weight: 100 900;\n"
             "  font-display: swap;\n"
-            "  unicode-range: U+2000-206F, U+3000-303F, U+FE10-FE1F,\n"
-            "    U+FE30-FE4F, U+FF00-FFEF;\n"
-            "}\n"
+            f"  unicode-range: {_unicode_range(v.unicodes)};\n"
+            "}"
         )
     out = DIST / "diantenjeom.css"
-    out.write_text("\n".join(lines), encoding="utf-8")
+    out.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
     return out
 
 
@@ -100,21 +174,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # TODO: replace with real mapping once source filenames are pinned.
+    # Scope: Japanese sans only. Add Variant rows here as locales come online.
     variants: list[Variant] = [
-        # Variant("sc", "sans", args.sources / "NotoSansCJKsc-Regular.otf"),
-        # Variant("tc", "sans", args.sources / "NotoSansCJKtc-Regular.otf"),
-        # Variant("jp", "sans", args.sources / "NotoSansCJKjp-Regular.otf"),
-        # Variant("kr", "sans", args.sources / "NotoSansCJKkr-Regular.otf"),
+        Variant(
+            locale="jp",
+            style="sans",
+            source=args.sources / "NotoSansCJKjp-VF.otf",
+            unicodes=codepoints.JP,
+        ),
     ]
 
-    if not variants:
-        raise SystemExit(
-            f"No source fonts configured. Place Noto CJK files under {args.sources}/ "
-            "and populate the variants list in build.py."
-        )
-
     for v in variants:
+        if not v.source.exists():
+            raise SystemExit(f"source missing: {v.source}")
         for path in subset_one(v):
             print(f"built {path.relative_to(ROOT)}")
 
