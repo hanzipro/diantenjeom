@@ -21,7 +21,13 @@ from pathlib import Path
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
-from diantenjeom import codepoints, ellipsis_pair, pin_locale, rotate_quotes, vert_nudge
+from diantenjeom import (
+    codepoints,
+    ellipsis_pair,
+    pin_locale,
+    rotate_quotes,
+    vert_nudge,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"

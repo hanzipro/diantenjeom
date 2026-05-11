@@ -55,6 +55,23 @@ change. More docs and examples to come.
   `docs/vertical-text.md` § "Ellipsis in Firefox vertical Latin runs"
   for the diagnostic timeline.
 
+- **`! : ; ?` sit ~10 % of em to the right of CJK centre axis in
+  Chrome / Safari (vertical mode).** Firefox renders them precisely
+  on the line centre. Hiragino Sans (also a CJK font) doesn't exhibit
+  this in any browser. Things tried that didn't move the needle:
+  shifting the source outline so the bbox is exactly em-centred,
+  matching hmtx LSB to the new bbox, zero-ing the GPOS `halt` / `vhal`
+  SinglePos entries that source Noto Sans CJK JP ships for these
+  glyphs. The 10 % offset is independent of `font-weight` (= not a
+  CFF2 variation blend issue) and doesn't respond to any of the
+  obvious font-side knobs — likely a hardcoded Chrome / Safari layout
+  behaviour for CJK punctuation in CFF2 variable fonts. Hiragino's
+  full `palt` / `vpal` SinglePos entries (with per-glyph proportional
+  values, not just halt's uniform -250 / -500) may be what spares it;
+  worth trying to ship matching palt / vpal SinglePos values if
+  someone picks this up later. See `docs/vertical-text.md`
+  § "`! : ; ?` offset in Chrome / Safari vertical".
+
 - **Align em-dash and 2-em-dash with the line's centre axis in vertical
   mode.** Both `—` (U+2014) and `⸺` (U+2E3A) currently render slightly
   off-centre relative to other CJK punctuation because UTR50 marks them

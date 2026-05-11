@@ -1,6 +1,7 @@
 :root {
   & {
     --sans: 'Diantenjeom Sans JP', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --sans: 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
     --serif:  'Diantenjeom Sans JP', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
 
     box-sizing: border-box;
