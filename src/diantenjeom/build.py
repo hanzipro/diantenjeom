@@ -59,9 +59,12 @@ class Variant:
     style: str    # "sans" | "serif"
     source: Path
     unicodes: list[int]
-    # Codepoints to force-rotate 90° CW in vertical mode (Latin curly
-    # quotes are universal; CJK locales share this set).
-    rotate_quotes: tuple[int, ...] = rotate_quotes.ROTATE_QUOTES
+    # Per-codepoint rotation configs (which glyphs get a pre-rotated vert
+    # alternate, and how to position them). Latin curly quotes + dashes
+    # are universal across CJK locales, so the default set applies as-is.
+    rotate_configs: dict[int, rotate_quotes.RotateConfig] = field(
+        default_factory=lambda: dict(rotate_quotes.ROTATE_CONFIGS)
+    )
     # Per-codepoint vertical-mode y nudges for vert-substituted glyphs.
     # Different locales position 、，等 differently — pass the right dict.
     vert_nudges: dict[int, int] = field(default_factory=dict)
@@ -140,7 +143,7 @@ def subset_one(variant: Variant) -> list[Path]:
     # Bake rotated copies of the Latin curly quotes and wire them into
     # vert/vrt2 — forces 90° CW rotation in vertical mode regardless of
     # the browser's run-segmentation heuristics. See rotate_quotes.py.
-    rotate_quotes.install(font, variant.rotate_quotes)
+    rotate_quotes.install(font, variant.rotate_configs)
     # Apply per-codepoint vertical-mode nudges (vmtx tsb + VORG + GPOS).
     vert_nudge.install(font, variant.vert_nudges)
 

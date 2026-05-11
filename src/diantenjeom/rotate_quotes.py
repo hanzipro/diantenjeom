@@ -1,5 +1,5 @@
-"""Force Latin curly quotes (U+2018/2019/201C/201D) to render rotated 90° CW
-in vertical writing mode.
+"""Force select codepoints to render rotated 90° CW in vertical writing
+mode by baking a pre-rotated glyph + a `vert` / `vrt2` substitution.
 
 Why this exists
 ---------------
@@ -35,7 +35,7 @@ advance and placed around the em mid-line vertically.
 from __future__ import annotations
 
 import math
-from typing import Iterable
+from dataclasses import dataclass
 
 from fontTools.misc.transform import Transform
 from fontTools.pens.boundsPen import BoundsPen
@@ -44,14 +44,53 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables as ot
 
-# Codepoints whose glyphs must be rotated 90° CW in vertical mode. Latin
-# curly quotes behave the same regardless of CJK locale, so this set is
-# universal — JP / TC / SC / KR all use it as-is.
+
+@dataclass(frozen=True)
+class RotateConfig:
+    """Per-codepoint rotation parameters.
+
+    `x_em` / `y_em` — where the rotated glyph's centre ends up, in em units
+        (multiplied by `head.unitsPerEm`).
+    `v_advance_em` — vertical advance in em units. `None` means "use the
+        source glyph's horizontal advance unchanged" (right for full-width
+        glyphs like em-dashes); a small fraction (e.g. 0.4) gives a tight
+        slot for narrow Latin curly quotes.
+    """
+    x_em: float = 0.5
+    y_em: float = 0.5
+    v_advance_em: float | None = None
+
+
+# Curly quotes: hug the right side of the line at roughly Latin cap height,
+# tight vertical advance so they don't bloat line spacing.
+_QUOTE_CONFIG = RotateConfig(x_em=0.35, y_em=0.5, v_advance_em=0.4)
+
+# Default mapping. Locale-agnostic — every CJK locale uses this set
+# because Latin curly quotes don't have CJK locale variants.
+#
+# NOTE: em-dash (U+2014) and 2-em dash (U+2E3A) were attempted here and
+# reverted. UTR50 marks them as `R` (always rotate), which Chrome and
+# Firefox honour by auto-rotating the source glyph and ignoring `vert`
+# substitutions, while Safari applies vert inconsistently between the
+# two codepoints. See docs/vertical-text.md "Dash alignment" for the
+# full investigation.
+ROTATE_CONFIGS: dict[int, RotateConfig] = {
+    0x2018: _QUOTE_CONFIG,
+    0x2019: _QUOTE_CONFIG,
+    0x201C: _QUOTE_CONFIG,
+    0x201D: _QUOTE_CONFIG,
+}
+
+# Backward-compat shim — only kept for the unlikely caller that imports
+# `ROTATE_QUOTES` directly. New code should use `ROTATE_CONFIGS`.
 ROTATE_QUOTES: tuple[int, ...] = (0x2018, 0x2019, 0x201C, 0x201D)
 
 
-def _add_rotated_glyph(font: TTFont, src_name: str, new_name: str) -> None:
-    """Append a 90°-CW-rotated copy of `src_name` to the font as `new_name`."""
+def _add_rotated_glyph(
+    font: TTFont, src_name: str, new_name: str, cfg: RotateConfig
+) -> None:
+    """Append a 90°-CW-rotated copy of `src_name` to the font as `new_name`,
+    positioned per `cfg`."""
     advance, _ = font["hmtx"][src_name]
     em = font["head"].unitsPerEm
 
@@ -65,18 +104,14 @@ def _add_rotated_glyph(font: TTFont, src_name: str, new_name: str) -> None:
     cx = (x_min + x_max) / 2
     cy = (y_min + y_max) / 2
 
-    # Compose right-to-left: translate(-cx,-cy) brings glyph centre to origin,
-    # then rotate -π/2 (CW), then translate to the destination centre.
-    # In vertical-rl: glyph local +X is the horizontal cross-axis of the
-    # line (high x → right side of line). Latin curly quotes sit near cap
-    # height (~0.66 em) in horizontal text; we put the rotated centre at
-    # x = 0.66 em so they hug the right side of the vertical line, mirroring
-    # that convention. Y centres on em/2 since vAdvance = the glyph's tight
-    # advance and the inline placement is decided by the renderer, not by
-    # our intra-glyph y.
+    # Compose right-to-left: translate(-cx,-cy) brings glyph centre to
+    # origin, then rotate -π/2 (CW), then translate to (x_em, y_em) in em
+    # units. Curly quotes anchor at x_em=0.35 to hug the right side of the
+    # vertical line at roughly Latin cap height; dashes anchor at 0.5/0.5
+    # to sit on the line's centre axis like the ellipsis.
     t = (
         Transform()
-        .translate(em * 0.35, em * 0.5)
+        .translate(em * cfg.x_em, em * cfg.y_em)
         .rotate(-math.pi / 2)
         .translate(-cx, -cy)
     )
@@ -118,13 +153,12 @@ def _add_rotated_glyph(font: TTFont, src_name: str, new_name: str) -> None:
     # hmtx: keep the same advance so an accidental horizontal use is sane.
     font["hmtx"].metrics[new_name] = (advance, 0)
 
-    # Vertical metrics: Firefox seems to ignore tight vAdvance values for
-    # small CFF2 glyphs and uses an OS/2-derived slot (≈em), which makes a
-    # narrow `advance` reservation produce a huge gap before the previous
-    # character. Compromise: vAdvance = em / 2, glyph centred in that slot.
-    # Chrome / Safari follow vmtx so the slot is 500 wide; Firefox ends up
-    # close enough that the visual mismatch goes away.
-    v_advance = round(em * 0.4)
+    # Vertical advance: small em-fraction for curly quotes (tight slot),
+    # source hAdvance for dashes (one or two em — consecutive dashes meet
+    # end-to-end). Firefox ignores tiny vAdvance and falls back to an
+    # OS/2-derived slot; em*0.4 is small enough to feel tight but large
+    # enough to keep Firefox in agreement with Chrome/Safari.
+    v_advance = round(em * cfg.v_advance_em) if cfg.v_advance_em is not None else advance
     bp_new = BoundsPen(glyph_set)
     glyph_set[src_name].draw(TransformPen(bp_new, t))
     if bp_new.bounds is not None:
@@ -184,22 +218,47 @@ def _attach_vert_lookup(font: TTFont, mapping: dict[str, str]) -> None:
 
 def install(
     font: TTFont,
-    codepoints: Iterable[int] = ROTATE_QUOTES,
+    configs: dict[int, RotateConfig] = ROTATE_CONFIGS,
 ) -> dict[str, str]:
     """Bake pre-rotated alternates + `vert`/`vrt2` substitutions for each
-    codepoint in `codepoints`. Returns the {src: rotated} glyph mapping
+    codepoint in `configs`. Returns the {src: rotated} glyph mapping
     that was installed.
+
+    Skips codepoints whose source glyph already has an existing `vert`
+    substitution — overriding those would fight the font's designed
+    vertical alternates (e.g. ellipsis already has one).
     """
     cmap = font.getBestCmap()
+    existing_vert = _vert_substitution_sources(font)
     mapping: dict[str, str] = {}
-    for cp in codepoints:
+    for cp, cfg in configs.items():
         src = cmap.get(cp)
-        if src is None:
+        if src is None or src in existing_vert:
             continue
         rotated = f"{src}.rot90"
-        _add_rotated_glyph(font, src, rotated)
+        _add_rotated_glyph(font, src, rotated, cfg)
         mapping[src] = rotated
 
     if mapping:
         _attach_vert_lookup(font, mapping)
     return mapping
+
+
+def _vert_substitution_sources(font: TTFont) -> set[str]:
+    """Return the set of source glyph names that already have a `vert`
+    substitution defined in GSUB."""
+    sources: set[str] = set()
+    if "GSUB" not in font:
+        return sources
+    gsub = font["GSUB"].table
+    lookup_to_feats: dict[int, set[str]] = {}
+    for fr in gsub.FeatureList.FeatureRecord:
+        for li in fr.Feature.LookupListIndex:
+            lookup_to_feats.setdefault(li, set()).add(fr.FeatureTag)
+    for li_idx, lookup in enumerate(gsub.LookupList.Lookup):
+        if "vert" not in lookup_to_feats.get(li_idx, set()):
+            continue
+        for st in lookup.SubTable:
+            if hasattr(st, "mapping"):
+                sources.update(st.mapping.keys())
+    return sources

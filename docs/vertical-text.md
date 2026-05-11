@@ -169,3 +169,66 @@ curl -s http://localhost:3000/dist/fonts/diantenjeom-sans-jp.woff2 | shasum -a 2
 
 If those two hashes differ, fix the server before chasing rendering
 ghosts.
+
+## Open issue: dash alignment
+
+`—` (U+2014, em-dash) and `⸺` (U+2E3A, two-em dash) render slightly
+off-centre relative to the ellipsis (`…`) in vertical mode in all three
+browsers — and also in bare Hiragino Sans, so it's not unique to our
+subset. Reproducing in plain HTML with `writing-mode: vertical-rl`:
+
+    語料庫……
+    ────
+    待命中——
+
+The dashes sit clearly left of the column's centre axis, while the
+ellipsis sits dead-centre.
+
+**Root cause.** UTR50 classifies both codepoints as `R` (always rotate
+90° CW in vertical text). For `R`-class, browsers are expected to
+auto-rotate the source glyph and **ignore** any `vert` substitution.
+Three engines, three slightly different interpretations:
+
+- **Chrome / Firefox** strictly follow UTR50 R — they rotate the source
+  outline themselves, ignoring our `vert` lookup. The rotation pivot
+  isn't (0, 0); empirically it appears to be advance-relative, so the
+  rotated bar ends up offset from em/2 by an amount that depends on the
+  glyph's horizontal advance.
+- **Safari (CoreText)** applies `vert` for `—` but **not** for `⸺` —
+  so even with a centred pre-rotated alternate in the font, the
+  two-em-dash stays mis-aligned, and the em-dash version renders our
+  alternate but with its own positioning quirks (we saw a visible gap
+  in the middle of `——`).
+
+**What we tried, didn't work.**
+
+1. **Add a `vert` substitution with a pre-rotated, centred alternate**
+   (the same trick that works for curly quotes). Safari respected it
+   for `—` but ignored it for `⸺`; Chrome / Firefox ignored it for
+   both. Code lived in `rotate_quotes.py`'s `ROTATE_CONFIGS`.
+
+2. **Shift the source outline up so its y-centre sits at em/2** —
+   intended to pre-compensate for the auto-rotation pivot. Result:
+   Chrome / Firefox over-shot to the right (the pivot model was
+   wrong), Safari `⸺` still untouched, Safari `——` showed
+   "too right + middle gap". The shift also affected horizontal
+   rendering of em-dashes (they'd appear at em/2 instead of around
+   the baseline).
+
+Both changes were reverted; `rotate_quotes.ROTATE_CONFIGS` no longer
+includes `0x2014` / `0x2E3A`. The font now ships the dashes as-is from
+Noto CJK, matching Hiragino's (also off-centre) behaviour.
+
+**To pick this up again**, things worth trying next:
+
+- Bypass `vert` entirely: emit a `ccmp` (always-on GSUB) substitution
+  to a pre-rotated alternate. `ccmp` fires before UTR50 orientation
+  logic, so browsers may apply it even for R-class codepoints. Risk:
+  it would also affect horizontal mode, where the rotated alternate
+  is the wrong shape.
+- Find each browser's actual rotation pivot empirically (with a debug
+  glyph at known coordinates) and pre-compensate per-engine.
+- Replace the cmap mapping to point at a centred pre-rotated glyph,
+  and add a horizontal-mode `ccmp` (or similar) substitution back to
+  a horizontal alternate. Two glyphs per codepoint; might be worth it
+  if shipping vertical-first.

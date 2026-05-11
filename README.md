@@ -43,6 +43,17 @@ change. More docs and examples to come.
 
 [fla]: https://developer.mozilla.org/en-US/docs/Web/CSS/font-language-override
 
+- **Align em-dash and 2-em-dash with the line's centre axis in vertical
+  mode.** Both `—` (U+2014) and `⸺` (U+2E3A) currently render slightly
+  off-centre relative to other CJK punctuation because UTR50 marks them
+  `R` (always rotate) — Chrome and Firefox auto-rotate the source glyph
+  and ignore `vert` substitutions, while Safari applies `vert`
+  inconsistently between the two codepoints. This matches Hiragino's
+  behaviour out of the box, so it's not unique to our subset, but it
+  still looks off compared to the ellipsis. See
+  `docs/vertical-text.md` § "Dash alignment" for the full investigation
+  and the attempted fixes that didn't pan out.
+
 ## License
 
 SIL Open Font License 1.1, inherited from Noto CJK.
