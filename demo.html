@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>diantenjeom — JP demo</title>
+<style>
+  @font-face {
+    font-family: 'Diantenjeom Sans JP';
+    src: url('./dist/fonts/diantenjeom-sans-jp.woff2') format('woff2-variations'),
+         url('./dist/fonts/diantenjeom-sans-jp.woff2') format('woff2');
+    font-weight: 100 900;
+    font-display: swap;
+    unicode-range:
+      U+00B7, U+2014, U+2018-2019, U+201C-201D, U+2026, U+2E3A,
+      U+3001-3002, U+3008-300F, U+3014-3015, U+30FB,
+      U+FF01, U+FF08-FF09, U+FF0C-FF0F, U+FF1A-FF1B, U+FF1F, U+FF3C;
+  }
+
+  :root {
+    /* Punctuation comes from Diantenjeom; Han falls through to system JP font. */
+    --jp: 'Diantenjeom Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+    /* Baseline: no diantenjeom, system handles everything. */
+    --jp-bare: 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+
+    /* TEST 4: HTML lang stays "ja" (JP default = 注字後下).
+       If this override works, punctuation should shift to 居中 (ZHT). */
+    font-language-override: "ZHT";
+  }
+
+  body {
+    font-family: var(--jp);
+    font-weight: 300;
+    margin: 2rem auto;
+    max-width: 64rem;
+    padding: 0 1.5rem;
+    line-height: 1.8;
+    color: #222;
+    background: #fafafa;
+  }
+  h1 { font-size: 1.4rem; margin-top: 2.5rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.8rem; color: #555; font-weight: 500; }
+  p  { margin: .25rem 0; }
+  .row { display: grid; grid-template-columns: 6rem 1fr; gap: 1rem; align-items: baseline; }
+  .row .label { color: #888; font-size: .82rem; font-family: ui-monospace, monospace; }
+  .bare { font-family: var(--jp-bare); }
+  .palt { font-feature-settings: "palt"; }
+  hr { border: 0; border-top: 1px solid #ddd; margin: 1.5rem 0; }
+
+  /* Vertical section */
+  .v-wrap { display: flex; gap: 2rem; align-items: flex-start; }
+  .v-col {
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    height: 22rem;
+    line-height: 1.7;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    background: white;
+    font-size: 1.05rem;
+  }
+  .v-col h2 { writing-mode: horizontal-tb; margin: 0 0 .5rem 0; }
+
+  code { font-family: ui-monospace, monospace; color: #666; font-size: .85em; }
+</style>
+</head>
+<body>
+
+<h1>diantenjeom — Noto Sans JP 標點字體 demo</h1>
+<p style="color:#666;font-size:.9rem">
+  上方一欄掛 <code>Diantenjeom Sans JP</code>，下方 <code>.bare</code> 是純系統字體做對照。
+  Han 字落到系統字體，只有標點由 diantenjeom 提供。
+</p>
+
+<h1>1. 橫排 · 標點外觀對比</h1>
+
+<h2>句號 / 逗號 / 頓號 — 注字後下（JP 慣例）</h2>
+<div class="row"><span class="label">diantenjeom</span><p>春は、あけぼの。やうやう白くなりゆく山ぎは、すこしあかりて。</p></div>
+<div class="row"><span class="label">system</span><p class="bare">春は、あけぼの。やうやう白くなりゆく山ぎは、すこしあかりて。</p></div>
+
+<h2>引號「」『』《》〈〉（）〔〕</h2>
+<div class="row"><span class="label">diantenjeom</span><p>「内『内容』容」《書名》〈篇〉（注）〔補〕</p></div>
+<div class="row"><span class="label">system</span><p class="bare">「内『内容』容」《書名》〈篇〉（注）〔補〕</p></div>
+
+<h2>破折號 / 二字寬破折號 / 刪節號 / 連接號 / 斜線</h2>
+<div class="row"><span class="label">diantenjeom</span><p>——本来⸺それは……二〇〇六年－二〇三六年／＼</p></div>
+<div class="row"><span class="label">system</span><p class="bare">——本来⸺それは……二〇〇六年－二〇三六年／＼</p></div>
+
+<h2>間隔號 · ／ ・</h2>
+<div class="row"><span class="label">diantenjeom</span><p>莫那·魯道　莫那・魯道</p></div>
+<div class="row"><span class="label">system</span><p class="bare">莫那·魯道　莫那・魯道</p></div>
+
+<hr>
+
+<h1>2. CSS 標點擠壓 — <code>font-feature-settings: "palt"</code></h1>
+<p style="color:#666;font-size:.9rem">
+  GPOS 中的 <code>palt</code>（並 <code>vpal</code>/<code>halt</code>/<code>vhal</code>）若被剝掉就壓不了。
+  下方兩行同字串，差別只在第二行加了 <code>palt</code>。
+</p>
+<div class="row"><span class="label">無 palt</span><p>「内容」、（注釈）。《書名》〈篇〉</p></div>
+<div class="row"><span class="label">palt</span><p class="palt">「内容」、（注釈）。《書名》〈篇〉</p></div>
+
+<hr>
+
+<h1>3. 直排 — <code>writing-mode: vertical-rl</code></h1>
+<p style="color:#666;font-size:.9rem">
+  GSUB 的 <code>vert</code>/<code>vrt2</code> 把句讀號旋到右上、把括號旋成直書版。
+  右欄是 diantenjeom，左欄是系統字體對照。
+</p>
+
+<div class="v-wrap">
+  <div class="v-col">
+    <h2>diantenjeom</h2>
+    春は、あけぼの。<br>
+    「やうやう白くなりゆく山ぎは」、<br>
+    すこしあかりて——<br>
+    紫だちたる雲の……<br>
+    （『枕草子』第一段）
+  </div>
+  <div class="v-col bare">
+    <h2>system</h2>
+    春は、あけぼの。<br>
+    「やうやう白くなりゆく山ぎは」、<br>
+    すこしあかりて——<br>
+    紫だちたる雲の……<br>
+    （『枕草子』第一段）
+  </div>
+</div>
+
+<hr>
+
+<h1>4. 變數軸 — <code>font-weight</code> 100–900</h1>
+<p style="font-weight:100">「内容」、（注）。 — w100</p>
+<p style="font-weight:300">「内容」、（注）。 — w300</p>
+<p style="font-weight:500">「内容」、（注）。 — w500</p>
+<p style="font-weight:700">「内容」、（注）。 — w700</p>
+<p style="font-weight:900">「内容」、（注）。 — w900</p>
+
+</body>
+</html>

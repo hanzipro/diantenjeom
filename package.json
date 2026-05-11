@@ -39,9 +39,13 @@
   "scripts": {
     "fetch:sources": "python scripts/fetch_sources.py",
     "build": "python scripts/build_fonts.py",
-    "prepublishOnly": "npm run build"
+    "dev": "serve .",
+    "prepublishOnly": "pnpm run build"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "serve": "^14.2.6"
   }
 }

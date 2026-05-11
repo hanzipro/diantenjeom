@@ -1,0 +1,48 @@
+:root {
+  & {
+    --sans: 'Diantenjeom Sans JP', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif:  'Diantenjeom Sans JP', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+
+    box-sizing: border-box;
+    padding-block: 2rem 10rem;
+    margin: 0;
+    padding: 0;
+
+    font-size: 16px;
+    font-family: var(--sans);
+    font-weight: 300;
+    text-spacing-trim: trim-start;
+  }
+  *, *::before, &::after {
+    box-sizing: inherit;
+  }
+}
+
+
+/* Article */
+article {
+  & {
+    inline-size: clamp(16em, 100%, 30em);
+    margin-inline: auto;
+    padding-inline: 1em;
+  }
+  h1 {
+    & {
+      font-size: 1.75em;
+      font-weight: 500;
+    }
+    span {
+      display: block;
+      font-weight: 200;
+      font-size: .875rem;
+    }
+  }
+
+  /* Toggles */
+  label:has(input[name="vertical"]:checked) ~ & {
+    writing-mode: vertical-rl;
+  }
+  label:has(input[name="serif"]:checked) ~ & {
+    font-family: var(--serif);
+  }
+}
