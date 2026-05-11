@@ -1,0 +1,18 @@
+# Build-time tooling only — not published. Contributors run `pip install -e .`
+# (or `uv sync`) to get fonttools etc., then `python scripts/build_fonts.py`.
+[project]
+name = "diantenjeom-build"
+version = "0.0.0"
+description = "Internal build scripts for diantenjeom. Not published; use the NPM package @han.css/diantenjeom instead."
+requires-python = ">=3.10"
+dependencies = [
+    "fonttools[woff]>=4.55",
+    "brotli>=1.1",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.7"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,47 @@
+{
+  "name": "@han.css/diantenjeom",
+  "version": "0.0.1",
+  "description": "Punctuation-only CJK fonts, per locale. Drop into a font fallback chain.",
+  "keywords": [
+    "cjk",
+    "font",
+    "punctuation",
+    "noto",
+    "chinese",
+    "japanese",
+    "korean",
+    "webfont",
+    "typography"
+  ],
+  "license": "SIL-OFL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ethantw/diantenjeom.git"
+  },
+  "homepage": "https://github.com/ethantw/diantenjeom#readme",
+  "type": "module",
+  "main": "./dist/diantenjeom.css",
+  "style": "./dist/diantenjeom.css",
+  "exports": {
+    ".": "./dist/diantenjeom.css",
+    "./css": "./dist/diantenjeom.css",
+    "./fonts/*": "./dist/fonts/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "fetch:sources": "python scripts/fetch_sources.py",
+    "build": "python scripts/build_fonts.py",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

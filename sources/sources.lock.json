@@ -1,0 +1,46 @@
+{
+  "_comment": "Pinned Noto CJK Variable Font sources from github.com/notofonts/noto-cjk. Sans and Serif ship under separate tags. To upgrade: bump the relevant `tag`, then run `python scripts/fetch_sources.py --write-checksums` to refresh the `sha256` values and commit. CI / contributors run without flags and the script verifies against these checksums.",
+  "base_url": "https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/",
+  "files": [
+    {
+      "tag": "Sans2.004",
+      "path": "Sans/Variable/OTF/NotoSansCJKsc-VF.otf",
+      "sha256": "2745e9681cb9d8a5c8901b62c9e1bd98c9c774365fc3b84dd467621013b51cd3"
+    },
+    {
+      "tag": "Sans2.004",
+      "path": "Sans/Variable/OTF/NotoSansCJKtc-VF.otf",
+      "sha256": "fb6fd590a4bcfe1b5d71b8bb0054719256b815e8fc700dd70fd171a3660a9e6b"
+    },
+    {
+      "tag": "Sans2.004",
+      "path": "Sans/Variable/OTF/NotoSansCJKjp-VF.otf",
+      "sha256": "ab2728702f90d2ae900309f299dc3c2b075010888a1a8a67fbd5b4c6aff713a0"
+    },
+    {
+      "tag": "Sans2.004",
+      "path": "Sans/Variable/OTF/NotoSansCJKkr-VF.otf",
+      "sha256": "828d8415c3e601d1b7b94c2a86f8609ce4f78abebb92773724f3f004269059e8"
+    },
+    {
+      "tag": "Serif2.003",
+      "path": "Serif/Variable/OTF/NotoSerifCJKsc-VF.otf",
+      "sha256": "eff651e003e5b6a9cb40412db7e6618ebb709d4aca6d03f9d150984660860b5d"
+    },
+    {
+      "tag": "Serif2.003",
+      "path": "Serif/Variable/OTF/NotoSerifCJKtc-VF.otf",
+      "sha256": "0ccffda602a3ea48057e7332a931e3d5505b0bafb1798d32e00b16d8d7508913"
+    },
+    {
+      "tag": "Serif2.003",
+      "path": "Serif/Variable/OTF/NotoSerifCJKjp-VF.otf",
+      "sha256": "2c13a0a124dfefcb02f93c30fa0d593aff473261bcffbc0f67d6c723a5e0a739"
+    },
+    {
+      "tag": "Serif2.003",
+      "path": "Serif/Variable/OTF/NotoSerifCJKkr-VF.otf",
+      "sha256": "3dbebb8d3cc7c949ad4488b11b5ffe61524958e3fe9a23d5b0f57be21513e306"
+    }
+  ]
+}

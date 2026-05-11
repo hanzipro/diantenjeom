@@ -1,0 +1,10 @@
+# NPM uses `files` in package.json as allowlist, but be explicit:
+src/
+scripts/
+sources/
+pyproject.toml
+*.py
+__pycache__/
+.venv/
+.github/
+.gitignore

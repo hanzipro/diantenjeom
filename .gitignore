@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist-python/
+build/
+
+# Node
+node_modules/
+*.tgz
+.npm/
+
+# Built fonts — regenerated from sources, but shipped to NPM
+dist/
+
+# Upstream Noto CJK binaries — fetched via scripts/fetch_sources.py.
+# The lockfile (sources/sources.lock.json) is committed; the fonts are not.
+sources/*.otf
+sources/*.ttf
+sources/*.ttc
+sources/*.part
