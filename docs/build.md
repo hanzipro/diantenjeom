@@ -43,7 +43,14 @@ tables. The current build keeps these tags:
 | `halt`, `vhal`| Half-width alternate metrics — same idea, half-width track. |
 | `fwid`, `hwid`, `pwid` | Explicit full/half/proportional width switches. |
 | `kern`, `vkrn`| Pair kerning (horizontal / vertical).                      |
-| `ccmp`, `locl`, `calt`, `rlig`, `mark`, `mkmk` | Standard shaping/positioning; harmless to keep. |
+| `ccmp`, `calt`, `rlig`, `mark`, `mkmk` | Standard shaping/positioning; harmless to keep. |
+
+**`locl` is intentionally dropped** — see the TODO in `README.md`. Keeping it
+would let one subset serve JP/ZHT/ZHS/KOR via OT language tags, but Safari
+doesn't yet implement CSS `font-language-override`, so we can't force a locale
+reliably from CSS. Until support stabilises we ship one file per locale and
+bake the locale's glyph forms in (Subsetter prunes the now-unreachable
+alternates automatically, which also shrinks the file).
 
 The subsetter follows GSUB closure under these tags, so the alternate
 glyphs they reference (vertical forms, half-width forms) are pulled in

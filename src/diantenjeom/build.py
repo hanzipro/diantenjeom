@@ -29,9 +29,20 @@ FONTS_OUT = DIST / "fonts"
 
 # Layout features to retain. Closure under these tags pulls in the alternate
 # glyphs they reference (vertical forms, half/proportional widths, kerning).
+#
+# NOTE: `locl` is intentionally OMITTED for now. Keeping it makes a single
+# Noto-CJK-JP subset shape correctly for ZHT/ZHS/KOR too (via OT language
+# tags), but Safari doesn't yet implement `font-language-override`, so we
+# can't reliably force a locale from CSS — we have to ship one file per
+# locale and bake each locale's glyph forms into its own file. Dropping
+# `locl` also prunes the now-unreachable alternate glyphs (e.g. zh-Hant
+# 居中 versions of 。、，) from the output, shrinking the file.
+# TODO(font-language-override): once Safari ships it and Chrome's
+# precedence bug w.r.t. HTML lang is resolved, re-add "locl" here and
+# collapse the per-locale files into one shared subset.
 KEEP_FEATURES = [
     # GSUB — shape substitution
-    "ccmp", "locl", "calt", "rlig",
+    "ccmp", "calt", "rlig",
     "vert", "vrt2",          # vertical alternates
     "fwid", "hwid", "pwid",  # width variants
     # GPOS — positioning / squeezing

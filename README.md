@@ -28,6 +28,21 @@ supported — and pick the punctuation style independently from the body face.
 Early. APIs, file names, and the punctuation codepoint set are all subject to
 change. More docs and examples to come.
 
+## TODO
+
+- **Collapse per-locale files into one shared subset.** The Noto CJK source
+  carries `locl` GSUB rules that map the same Unicode punctuation to different
+  glyph forms per OT language tag (JAN / ZHT / ZHS / KOR), so a single subset
+  could serve every locale if downstream pages set `lang` or
+  [`font-language-override`][fla] correctly. We currently ship one file per
+  locale and strip `locl` at build time, because **Safari does not yet
+  implement `font-language-override`** and Chrome has precedence bugs when an
+  HTML `lang` attribute is already set. Revisit once browser support
+  stabilises — flip `locl` back on in `KEEP_FEATURES` (`src/diantenjeom/build.py`)
+  and the alternate glyphs will be retained automatically.
+
+[fla]: https://developer.mozilla.org/en-US/docs/Web/CSS/font-language-override
+
 ## License
 
 SIL Open Font License 1.1, inherited from Noto CJK.
