@@ -1,8 +1,7 @@
 :root {
   & {
     --sans: 'Diantenjeom Sans JP', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
-    /* --sans: 'Noto Sans CJK JP Variable', 'Noto Sans CJK JP', 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif; */
-    --serif:  'Diantenjeom Sans JP', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+    --serif:  'Diantenjeom Serif JP', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
 
 
     box-sizing: border-box;
@@ -11,7 +10,6 @@
 
     font-size: 16px;
     font-family: var(--sans);
-    font-weight: 300;
     text-spacing-trim: trim-start;
   }
   *, *::before, &::after {
@@ -23,21 +21,38 @@
 /* Article */
 article {
   & {
-    margin-inline: auto;
+    margin: auto;
     padding-inline: 1em;
-    inline-size: clamp(16em, 100%, 30em);
-    text-align: justify;
+    inline-size: clamp(12em, 100%, 40em);
+    columns: 12em auto;
+    column-gap: 2em;
+    font-weight: 300;
     line-height: 1.75;
+    text-align: justify;
   }
   h1 {
     & {
       font-size: 1.75em;
-      font-weight: 500;
+      font-weight: bolder;
     }
     span {
       display: block;
       font-weight: 200;
       font-size: .875rem;
+    }
+  }
+  h2 {
+    font-weight: bolder;
+  }
+  :where(h1, h2, h3, h4, h5, h6, p) {
+    margin: 0;
+  }
+  p {
+    & {
+      text-indent: 1em;
+    }
+    &:first-of-type {
+      text-indent: 0;
     }
   }
 

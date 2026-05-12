@@ -6,6 +6,17 @@
   <title>@han-css/fonts — Demo</title>
   <link rel="stylesheet" href="dist/diantenjeom.css">
   <link rel="stylesheet" href="main.css">
+
+  <script type="module">
+    const $weightInput = document.querySelector('input[name=weight]')
+    const $weightOutput = document.querySelector('output[name=weight]')
+    const $article = document.querySelector('article')
+
+    $weightInput.addEventListener('input', () => {
+      $weightOutput.textContent = $weightInput.value
+      $article.style.fontWeight = $weightInput.value
+    })
+  </script>
 </head>
 <body>
   <label>
@@ -13,14 +24,20 @@
     直排
   </label>
   <label>
-    <input type="checkbox" name="serif" />
+    <input type="checkbox" name="serif" checked />
     明體
   </label>
   <label>
-    字重 <output id="weight-out">300</output>
-    <input type="range" name="weight" min="100" max="900" step="50" value="300"
-           oninput="document.documentElement.style.fontWeight = this.value;
-                    document.getElementById('weight-out').textContent = this.value;" />
+    字重
+    <output name="weight">300</output>
+    <input
+      type="range"
+      name="weight"
+      min="100"
+      max="900"
+      step="10"
+      value="300"
+    />
   </label>
 
   <article>
