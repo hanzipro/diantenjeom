@@ -16,6 +16,12 @@
     <input type="checkbox" name="serif" />
     明體
   </label>
+  <label>
+    字重 <output id="weight-out">300</output>
+    <input type="range" name="weight" min="100" max="900" step="50" value="300"
+           oninput="document.documentElement.style.fontWeight = this.value;
+                    document.getElementById('weight-out').textContent = this.value;" />
+  </label>
 
   <article>
     <h1>
