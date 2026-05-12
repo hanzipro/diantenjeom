@@ -4,24 +4,42 @@
 
 A set of punctuation-only CJK fonts, extracted from
 Noto Sans CJK +
-Noto Serif CJK.
+Noto Serif CJK, shipped as variable fonts.
 
 The name strings together the readings of **點** ("dot") in Mandarin (*diǎn*),
-Japanese (*ten*), and Korean (*jeom*) — the three locales this project
-supports as first-class targets.
+Japanese (*ten*), and Korean (*jeom*) — the three reading traditions whose
+punctuation conventions the project sets out to disentangle.
 
 ## Why
 
 CJK text routinely mixes a Latin body font with a CJK fallback. That fallback
-also has to render the punctuation — and different locales render the *same*
-Unicode punctuation differently (the position of `。`, the shape of `「」`, the
-width of `、`). Bundling punctuation with whichever CJK font happens to be
-loaded forces a single locale's convention onto everyone.
+also has to render the punctuation — and different conventions render the
+*same* Unicode punctuation differently (the position of `。`, the shape of
+`「」`, the width of `、`, where `〕，` should squeeze). Bundling punctuation
+with whichever CJK font happens to be loaded forces one convention onto
+everyone.
 
-**diantenjeom** pulls just the punctuation glyphs out of Noto CJK, per locale
-and weight, so you can drop them into a font fallback chain — CSS
-`font-family`, InDesign composite fonts, app text styles, anywhere fallback is
-supported — and pick the punctuation style independently from the body face.
+**diantenjeom** pulls just the punctuation glyphs out of Noto CJK and ships
+them as small variable fonts you drop into a font fallback chain — CSS
+`font-family`, InDesign composite fonts, app text styles, anywhere fallback
+is supported — and pick the punctuation style independently from the body
+face.
+
+## Variants
+
+Each style ships as a separate variable font; pick by punctuation positioning
+convention, not by language tag.
+
+| Family                          | Style    | Punctuation convention                              |
+|---------------------------------|----------|-----------------------------------------------------|
+| `Diantenjeom Sans`              | Sans     | JP-style — recommended default. 、，。 hug the top   |
+| `Diantenjeom Serif`             | Serif    | JP-style — recommended default                       |
+| *(Planned)* `… Centered`        | both     | TW MOE — 、，。 centred                              |
+| *(Planned)* `… GB`              | both     | Mainland — 、，。：；！？ all side-aligned             |
+
+Each variant exposes the full `wght` axis (Sans 100–900, Serif 200–900) with
+named instances on the CSS-standard grid: Thin / ExtraLight / Light / Regular
+/ Medium / SemiBold / Bold / ExtraBold / Black.
 
 ## Status
 
@@ -30,12 +48,12 @@ change. More docs and examples to come.
 
 ## TODO
 
-- **Collapse per-locale files into one shared subset.** The Noto CJK source
+- **Collapse per-style files into one shared subset.** The Noto CJK source
   carries `locl` GSUB rules that map the same Unicode punctuation to different
   glyph forms per OT language tag (JAN / ZHT / ZHS / KOR), so a single subset
-  could serve every locale if downstream pages set `lang` or
+  could serve every punctuation convention if downstream pages set `lang` or
   [`font-language-override`][fla] correctly. We currently ship one file per
-  locale and strip `locl` at build time, because **Safari does not yet
+  style and strip `locl` at build time, because **Safari does not yet
   implement `font-language-override`** and Chrome has precedence bugs when an
   HTML `lang` attribute is already set. Revisit once browser support
   stabilises — flip `locl` back on in `KEEP_FEATURES` (`src/diantenjeom/build.py`)
