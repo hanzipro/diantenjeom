@@ -75,7 +75,38 @@ def _alias_vert_to_jan(table) -> None:
 _TR_UPRIGHT_CODEPOINTS = (0xFF1B,)  # ；分號
 
 
-def _add_upright_self_substs(font: TTFont, table) -> None:
+def _force_upright(font: TTFont, table, codepoints: tuple[int, ...]) -> None:
+    """Override existing vert/vrt2 SingleSubst entries for `codepoints`
+    to map each source glyph to itself (no rotation).
+
+    JP convention rotates ：(U+FF1A) 90° in vertical mode via a SingleSubst
+    under JAN's vert. Centered / GB punct styles keep it upright. Stripping
+    the entry outright would let Firefox apply the UTR50 Tr-class default
+    rotation; rewriting to identity preserves a vert entry so all browsers
+    see "vertical handling exists, render upright".
+    """
+    if not codepoints:
+        return
+    cmap = font.getBestCmap()
+    src_glyphs = {cmap[cp] for cp in codepoints if cp in cmap}
+    if not src_glyphs:
+        return
+    vert_lookups: set[int] = set()
+    for fr in table.FeatureList.FeatureRecord:
+        if fr.FeatureTag in _LOCALE_VARIANT_TAGS:
+            vert_lookups.update(fr.Feature.LookupListIndex)
+    for li in vert_lookups:
+        lookup = table.LookupList.Lookup[li]
+        if lookup.LookupType != 1:
+            continue
+        for st in lookup.SubTable:
+            if hasattr(st, "mapping"):
+                for g in src_glyphs:
+                    if g in st.mapping:
+                        st.mapping[g] = g
+
+
+def _add_upright_self_substs(font: TTFont, table, extras: tuple[int, ...] = ()) -> None:
     cmap = font.getBestCmap()
     feature_list = table.FeatureList.FeatureRecord
 
@@ -109,7 +140,7 @@ def _add_upright_self_substs(font: TTFont, table) -> None:
     if target_mapping is None:
         return
 
-    for cp in _TR_UPRIGHT_CODEPOINTS:
+    for cp in _TR_UPRIGHT_CODEPOINTS + tuple(extras):
         glyph = cmap.get(cp)
         if glyph and glyph not in target_mapping:
             target_mapping[glyph] = glyph
@@ -131,7 +162,7 @@ def _empty_orphan_lookups(table) -> None:
                 st.mapping = {}
 
 
-def install(font: TTFont) -> None:
+def install(font: TTFont, extra_upright: tuple[int, ...] = ()) -> None:
     for table_tag in ("GSUB", "GPOS"):
         if table_tag not in font:
             continue
@@ -146,5 +177,6 @@ def install(font: TTFont) -> None:
     if "GSUB" in font:
         gsub = font["GSUB"].table
         _alias_vert_to_jan(gsub)
-        _add_upright_self_substs(font, gsub)
+        _force_upright(font, gsub, extra_upright)
+        _add_upright_self_substs(font, gsub, extra_upright)
         _empty_orphan_lookups(gsub)

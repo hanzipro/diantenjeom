@@ -100,6 +100,10 @@ class Variant:
     # Different punctuation styles position 、，等 differently — pass the
     # right dict. Empty dict means "use source positions as-is".
     vert_nudges: dict[int, int] = field(default_factory=dict)
+    # Codepoints whose JP-default vert rotation should be cancelled (kept
+    # upright in vertical mode). Centered / GB conventions keep ：upright;
+    # JP rotates it. Default empty = behave as JP source.
+    upright_cps: tuple[int, ...] = ()
 
     @property
     def stem(self) -> str:
@@ -252,7 +256,7 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # (ZHT/ZHS/KOR/etc.) falls back to JAN-style vert wiring. Without this
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
-    pin_locale.install(font)
+    pin_locale.install(font, variant.upright_cps)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
     ellipsis_pair.install(font)
@@ -351,6 +355,26 @@ def main() -> None:
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.JP,
             vert_nudges=vert_nudge.JP_SERIF,
+        ),
+        # Centered: TW MOE-style punctuation positioning. For now the only
+        # divergence from JP is ：(U+FF1A) staying upright in vertical mode
+        # (Chinese convention) instead of rotating 90° (JP convention).
+        # 、，。centring and other Centered-specific adjustments to follow.
+        Variant(
+            punct="centered",
+            style="sans",
+            source=args.sources / "NotoSansCJKjp-VF.otf",
+            unicodes=codepoints.JP,
+            vert_nudges=vert_nudge.JP,
+            upright_cps=(0xFF1A,),
+        ),
+        Variant(
+            punct="centered",
+            style="serif",
+            source=args.sources / "NotoSerifCJKjp-VF.otf",
+            unicodes=codepoints.JP,
+            vert_nudges=vert_nudge.JP_SERIF,
+            upright_cps=(0xFF1A,),
         ),
     ]
 

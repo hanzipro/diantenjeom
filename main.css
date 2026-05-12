@@ -26,6 +26,7 @@ article {
     inline-size: clamp(12em, 100%, 40em);
     columns: 12em auto;
     column-gap: 2em;
+    font-family: var(--sans);
     font-weight: 300;
     line-height: 1.75;
     text-align: justify;
@@ -62,5 +63,10 @@ article {
   }
   label:has(input[name="serif"]:checked) ~ & {
     font-family: var(--serif);
+  }
+
+  &.centered {
+    --sans: 'Diantenjeom Sans Centered', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif: 'Diantenjeom Serif Centered', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
   }
 }
