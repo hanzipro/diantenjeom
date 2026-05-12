@@ -257,24 +257,50 @@ this case correctly:
 In vertical writing mode `！` (U+FF01), `：` (U+FF1A), `；` (U+FF1B) and
 `？` (U+FF1F) appear ~10 % of em to the right of where adjacent CJK
 characters sit, in Chrome and Safari. Firefox renders them precisely
-on the line's centre axis (cross-axis centre). Hiragino Sans —
-another full CJK font — doesn't exhibit this in any browser.
+on the line's centre axis. Hiragino Sans — another full CJK font —
+doesn't exhibit this in any browser. **Original unsubsetted Noto Sans
+CJK JP also exhibits the offset** when shipped as a webfont, so it's
+not introduced by our build pipeline; it's something Chrome / Safari
+do downstream that we couldn't pin to any specific font metadata.
 
-**Things tested, all no-effect on Chrome / Safari:**
+### Current state
+
+`center_punct.install()` translates each affected glyph's CFF2 outline
+left by **50 font units** (5 % em) and updates hmtx LSB to match. This
+splits the visible delta:
+
+- Chrome / Safari: now precisely on centre (was ~10 % right; -50 cancels
+  half of it).
+- Firefox: now ~5 % left of centre (was on centre; -50 shifts it that
+  much).
+
+Both are within visual tolerance. The trade-off is documented in the
+README TODO.
+
+### What we tested, all no-effect on Chrome / Safari
 
 1. Shifting the source outline horizontally so each glyph's bbox is
-   exactly em-centred (`？` outline was 264–722 → 271–729; `；` 408–569
-   → 420–581). Also updated hmtx LSB to match the new bbox x_min so
-   metric and outline stay consistent.
+   exactly em-centred — without an additional uniform shift this only
+   moves Firefox, not C/S. Same with matching hmtx LSB to new x_min.
 2. Zero-ing the GPOS `halt` SinglePos values (`XPlacement=-250,
    XAdvance=-500`) that source Noto Sans CJK JP ships for `! : ;`.
 3. Zero-ing the GPOS `vhal` SinglePos values for the colon vert
    target.
 4. Testing at `font-weight: 100` (= default-instance, no CFF2
-   variation blending). The offset stays. So it's not a variation
-   blend issue.
+   variation blending). Offset persists; not a blend issue.
+5. Disabling every post-subset transform (pin_locale, rotate_quotes,
+   vert_nudge, ellipsis_pair) and rebuilding with only fontTools'
+   Subsetter. Offset still there. So the issue is introduced by the
+   Subsetter (or by something earlier in the pipeline), not by any of
+   our additions.
+6. Keeping the source name `Noto Sans CJK JP` instead of renaming to
+   `Diantenjeom Sans JP`. No effect — not a name-based heuristic.
+7. Forcing `head.xMin/xMax` to match source values. fontTools'
+   serialiser recomputes head bbox from outlines on save, so the
+   override doesn't survive; we never got a clean test of whether
+   head bbox influences the offset.
 
-**Hiragino vs our font, what's structurally different:**
+### Hiragino vs our font, what's structurally different
 
 - Hiragino is CFF (non-variable); ours is CFF2 (variable wght axis).
   HVAR / VVAR / fvar / gvar / STAT exist only in ours.
@@ -289,23 +315,17 @@ another full CJK font — doesn't exhibit this in any browser.
   subset has only `halt` (uniform −250 / −500), no `palt` for these
   glyphs. Hiragino additionally has `vpal` entries for `?` and `!`.
 
-**Hypothesis for the residual offset:** Chrome / Safari auto-apply
-`palt` (or `vpal` in vertical) in some CJK shaping path for these
-glyphs. With Hiragino's per-glyph proportional values, the result lands
-on the line centre. With our font's missing palt entries — and source
-Noto's halt being a uniform half-width shift, not proportional —
-Chrome / Safari fall back to … something that puts the glyph
-~10 % right. We couldn't pin it down precisely from the font side.
-
-**Worth trying next** if revisiting:
+### Worth trying next
 
 - Add `palt` (and `vpal`) SinglePos entries matching Hiragino's
   per-glyph proportional values for `! : ; ?` to our font. Risk: this
   changes the explicit-opt-in behaviour for callers who set
-  `font-feature-settings: "palt"` themselves.
+  `font-feature-settings: "palt"` themselves, but might let us drop
+  the brute-force outline shift in favour of a cross-browser-correct
+  positioning feature.
 - Build a non-variable instance of our font (drop variation tables) and
-  compare. If a non-variable version of our glyphs renders correctly,
-  the bug is specifically in Chrome / Safari's CFF2 variable vertical
+  compare. If a non-variable version renders correctly in C/S, the
+  bug is specifically in Chrome / Safari's CFF2 variable vertical
   pipeline.
 - Find the exact Blink / WebKit code path that aligns Common-script
   CJK punctuation cross-axis in vertical mode and diff against the

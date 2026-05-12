@@ -22,6 +22,7 @@ from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
 from diantenjeom import (
+    center_punct,
     codepoints,
     ellipsis_pair,
     pin_locale,
@@ -145,16 +146,13 @@ def subset_one(variant: Variant) -> list[Path]:
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
     pin_locale.install(font)
-
-    # Bake rotated copies of the Latin curly quotes and wire them into
-    # vert/vrt2 — forces 90° CW rotation in vertical mode regardless of
-    # the browser's run-segmentation heuristics. See rotate_quotes.py.
     rotate_quotes.install(font, variant.rotate_configs)
-    # Apply per-codepoint vertical-mode nudges (vmtx tsb + VORG + GPOS).
     vert_nudge.install(font, variant.vert_nudges)
-    # Split single vs paired U+2026 ellipsis: single → Latin-low form,
-    # double → CJK-centred form (current behaviour).
     ellipsis_pair.install(font)
+    # Brute-force horizontal shift on ! : ; ? to compensate for the
+    # Chrome/Safari ~10% cross-axis right offset on these glyphs (see
+    # README TODO / docs/vertical-text.md).
+    center_punct.install(font)
 
     # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
     # leaves stale bits behind — bit 31 (General Punctuation, where U+2026
