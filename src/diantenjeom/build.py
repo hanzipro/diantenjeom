@@ -21,6 +21,25 @@ from pathlib import Path
 
 from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.tables._f_v_a_r import NamedInstance
+
+# CSS-standard wght-axis named instances. Source Han / Noto CJK ships
+# a Sans/Serif-inconsistent set (Sans has Thin + DemiLight, Serif has
+# ExtraLight + SemiBold; only Light/Regular/Medium/Bold/Black overlap).
+# We replace those with this canonical CSS naming, filtered per font's
+# actual axis range.
+CANONICAL_INSTANCES: list[tuple[int, str]] = [
+    (100, "Thin"),
+    (200, "ExtraLight"),
+    (300, "Light"),
+    (400, "Regular"),
+    (500, "Medium"),
+    (600, "SemiBold"),
+    (700, "Bold"),
+    (800, "ExtraBold"),
+    (900, "Black"),
+]
+INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
 
 from diantenjeom import (
     center_punct,
@@ -63,7 +82,11 @@ KEEP_FEATURES = [
 
 @dataclass(frozen=True)
 class Variant:
-    locale: str   # "sc" | "tc" | "jp" | "kr"
+    # Punctuation positioning style. Empty string is the JP/recommended
+    # default — no suffix appears in the family name or file stem.
+    # Other anticipated values: "centered" (TW MOE-style 、，。 centred),
+    # "gb" (mainland-style 、，。：；！？ side-aligned).
+    punct: str
     style: str    # "sans" | "serif"
     source: Path
     unicodes: list[int]
@@ -74,16 +97,19 @@ class Variant:
         default_factory=lambda: dict(rotate_quotes.ROTATE_CONFIGS)
     )
     # Per-codepoint vertical-mode y nudges for vert-substituted glyphs.
-    # Different locales position 、，等 differently — pass the right dict.
+    # Different punctuation styles position 、，等 differently — pass the
+    # right dict. Empty dict means "use source positions as-is".
     vert_nudges: dict[int, int] = field(default_factory=dict)
 
     @property
     def stem(self) -> str:
-        return f"diantenjeom-{self.style}-{self.locale}"
+        suffix = f"-{self.punct}" if self.punct else ""
+        return f"diantenjeom-{self.style}{suffix}"
 
     @property
     def family(self) -> str:
-        return f"Diantenjeom {self.style.title()} {self.locale.upper()}"
+        suffix = f" {self.punct.title()}" if self.punct else ""
+        return f"Diantenjeom {self.style.title()}{suffix}"
 
 
 def _rename_family(font: TTFont, family: str) -> None:
@@ -140,6 +166,63 @@ def _rename_family(font: TTFont, family: str) -> None:
             continue
         rewritten = pattern.sub(postscript, value)
         name.setName(rewritten, rec.nameID, rec.platformID, rec.platEncID, rec.langID)
+
+    _canonicalize_instances(font, postscript)
+
+
+def _canonicalize_instances(font: TTFont, postscript: str) -> None:
+    """Replace fvar instances with the CSS-standard set.
+
+    Strips Noto's mixed naming (DemiLight on Sans, SemiBold-but-no-
+    ExtraBold on Serif, etc.) and writes one consistent list across
+    every style we ship. Each instance becomes a {Weight} entry whose
+    PostScript name is `{postscript}-{Weight}`. Old per-instance name
+    records (IDs 266-279 on the Source Han line) are left in place but
+    no longer referenced — we allocate fresh IDs starting at 300 to
+    avoid collisions with anything we haven't audited.
+
+    STAT (the Style Attribute Table) also references instance names
+    via axis values; we leave those pointing at the old records since
+    the new records are a superset and STAT's role is style fallback
+    metadata, not the user-visible instance menu.
+    """
+    name = font["name"]
+    fvar = font["fvar"]
+    wght_axis = next(a for a in fvar.axes if a.axisTag == "wght")
+    wmin, wmax = wght_axis.minValue, wght_axis.maxValue
+
+    # Which name-record slots (platform, encoding, lang) the existing
+    # instance records used — we want to write into the same slots so
+    # every platform that read the old names sees the new ones.
+    sample_id = fvar.instances[0].subfamilyNameID if fvar.instances else None
+    slots: set[tuple[int, int, int]] = set()
+    if sample_id is not None:
+        for rec in name.names:
+            if rec.nameID == sample_id:
+                slots.add((rec.platformID, rec.platEncID, rec.langID))
+    if not slots:
+        slots = {(3, 1, 0x409), (1, 0, 0)}
+
+    next_id = 300
+    new_instances: list[NamedInstance] = []
+    for wght, weight_name in CANONICAL_INSTANCES:
+        if wght < wmin or wght > wmax:
+            continue
+        sub_id = next_id
+        ps_id = next_id + 1
+        next_id += 2
+        for plat, enc, lang in slots:
+            name.setName(weight_name, sub_id, plat, enc, lang)
+            name.setName(f"{postscript}-{weight_name}", ps_id, plat, enc, lang)
+
+        inst = NamedInstance()
+        inst.coordinates = {"wght": float(wght)}
+        inst.subfamilyNameID = sub_id
+        inst.postscriptNameID = ps_id
+        inst.flags = INSTANCE_FLAG_ELIDABLE if weight_name == "Regular" else 0
+        new_instances.append(inst)
+
+    fvar.instances = new_instances
 
 
 def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
@@ -251,17 +334,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Scope: Japanese sans + serif. Add Variant rows here as locales come online.
+    # Scope: JP-style sans + serif (the recommended default; no suffix in
+    # the family name). Add `punct="centered"` / `punct="gb"` variants
+    # here as those positioning styles come online.
     variants: list[Variant] = [
         Variant(
-            locale="jp",
+            punct="",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.JP,
             vert_nudges=vert_nudge.JP,
         ),
         Variant(
-            locale="jp",
+            punct="",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.JP,
