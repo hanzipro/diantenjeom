@@ -37,9 +37,24 @@ from diantenjeom._outline import shift_in_place
 
 # Per-locale default offsets, in font units. Keep keys explicit and
 # locale-named so build.py can pick the right dict per Variant.
+#
+# Sans and Serif source fonts have DIFFERENT default vert-form positions
+# for 、，— Serif's `，vert` already sits ~130 units lower than Sans's
+# (its glyph00035 has tsb=102 in source vs Sans's -28). So the same
+# -120 nudge stacks differently: Sans lands at tsb=92 (visually near
+# top, JP convention); Serif would land at tsb=222 (visually mid-slot).
+# We keep a separate dict for Serif with no nudge — its source position
+# is already close enough to where the Sans nudged version ends up.
 JP: dict[int, int] = {
-    0x3001: -120,  # 、頓號 — Noto JP places it at top-right; nudge down.
+    0x3001: -120,  # 、頓號 — Noto Sans JP places it at top-right; nudge down.
     0xFF0C: -120,  # ，全形逗號 — same JP convention.
+}
+
+JP_SERIF: dict[int, int] = {
+    # No nudge — Serif's source already places these comfortably for JP
+    # vertical convention. Adding -120 (as Sans needs) pushes them too
+    # far down and disrupts browser text-spacing-trim squeeze detection
+    # on pairs like 〕，.
 }
 
 

@@ -15,6 +15,7 @@ Current scope: Noto Sans JP only. Other locales/styles wired up later.
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -117,8 +118,31 @@ def _rename_family(font: TTFont, family: str) -> None:
         for plat, enc, lang in existing:
             name.setName(value, nid, plat, enc, lang)
 
+    # Source Han / Noto ships per-instance PostScript names (IDs 267, 269,
+    # 271, …) of the form `NotoSansCJKjp-Regular` and a Unique ID (ID 3)
+    # of `2.004;ADBO;NotoSansCJKjp-Thin;ADOBE`. These still identify the
+    # font as Noto inside OS font-management UIs / app font menus, which
+    # is exactly what OFL's Reserved Font Name clause prohibits in a
+    # derivative. Rewrite any occurrence of `Noto{Sans,Serif}CJK{jp,kr,
+    # sc,tc}` to our own PostScript family prefix. We deliberately only
+    # touch records that already contain the substring — name IDs 0
+    # (copyright) and 7 (trademark) on Source Han mention "Source" /
+    # "Noto" / "Adobe" / "Google" and MUST be preserved verbatim per OFL.
+    pattern = re.compile(r"Noto(Sans|Serif)CJK(jp|kr|sc|tc)")
+    for rec in name.names:
+        if rec.nameID in (0, 7):  # copyright + trademark — leave alone
+            continue
+        try:
+            value = rec.toUnicode()
+        except UnicodeDecodeError:
+            continue
+        if not pattern.search(value):
+            continue
+        rewritten = pattern.sub(postscript, value)
+        name.setName(rewritten, rec.nameID, rec.platformID, rec.platEncID, rec.langID)
 
-def subset_one(variant: Variant) -> list[Path]:
+
+def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     font = TTFont(variant.source)
 
     opts = Options()
@@ -173,7 +197,13 @@ def subset_one(variant: Variant) -> list[Path]:
     font.flavor = "woff2"
     font.save(woff2_path)
 
-    return [otf_path, woff2_path]
+    # Pull the actual wght-axis range out of fvar so the @font-face
+    # block advertises what the variable font really supports (Serif
+    # starts at 200, not 100).
+    wght_axis = next(a for a in font["fvar"].axes if a.axisTag == "wght")
+    weight_range = (int(wght_axis.minValue), int(wght_axis.maxValue))
+
+    return [otf_path, woff2_path], weight_range
 
 
 def _unicode_range(unicodes: list[int]) -> str:
@@ -193,15 +223,15 @@ def _unicode_range(unicodes: list[int]) -> str:
     return ", ".join(parts)
 
 
-def write_css(variants: list[Variant]) -> Path:
+def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
     blocks: list[str] = []
-    for v in variants:
+    for v, (wmin, wmax) in entries:
         url = f"./fonts/{v.stem}.woff2"
         blocks.append(
             "@font-face {\n"
             f"  font-family: '{v.family}';\n"
             f"  src: url('{url}') format('woff2-variations');\n"
-            "  font-weight: 100 900;\n"
+            f"  font-weight: {wmin} {wmax};\n"
             "  font-display: swap;\n"
             f"  unicode-range: {_unicode_range(v.unicodes)};\n"
             "}"
@@ -221,7 +251,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Scope: Japanese sans only. Add Variant rows here as locales come online.
+    # Scope: Japanese sans + serif. Add Variant rows here as locales come online.
     variants: list[Variant] = [
         Variant(
             locale="jp",
@@ -230,15 +260,25 @@ def main() -> None:
             unicodes=codepoints.JP,
             vert_nudges=vert_nudge.JP,
         ),
+        Variant(
+            locale="jp",
+            style="serif",
+            source=args.sources / "NotoSerifCJKjp-VF.otf",
+            unicodes=codepoints.JP,
+            vert_nudges=vert_nudge.JP_SERIF,
+        ),
     ]
 
+    entries: list[tuple[Variant, tuple[int, int]]] = []
     for v in variants:
         if not v.source.exists():
             raise SystemExit(f"source missing: {v.source}")
-        for path in subset_one(v):
+        paths, weight_range = subset_one(v)
+        for path in paths:
             print(f"built {path.relative_to(ROOT)}")
+        entries.append((v, weight_range))
 
-    css = write_css(variants)
+    css = write_css(entries)
     print(f"wrote {css.relative_to(ROOT)}")
 
 

@@ -380,6 +380,42 @@ Both changes were reverted; `rotate_quotes.ROTATE_CONFIGS` no longer
 includes `0x2014` / `0x2E3A`. The font now ships the dashes as-is from
 Noto CJK, matching Hiragino's (also off-centre) behaviour.
 
+## Per-style vert nudges: Sans and Serif need different `，`/`、` offsets
+
+The `vert_nudge.JP` dict (`{0x3001: -120, 0xFF0C: -120}`) was tuned
+visually against Noto Sans CJK JP, where the vert-form comma
+(`glyph00035`) ships with `vmtx` tsb = -28. After our -120 nudge it
+lands at tsb = 92 — visually near the top of the 1000-unit vertical
+slot, matching JP body-text convention.
+
+Noto Serif CJK JP's source places the same vert form at **tsb = 102
+already** (130 units lower than Sans). Applying the same -120 nudge
+pushes Serif's comma to tsb = 222 — visually around mid-slot, well
+past the "top-attached句讀" position.
+
+The position itself was acceptable visually, but it broke browser
+**`text-spacing-trim` squeeze detection on `〕，` pairs** (and likely
+others). In all three browsers tested, vertical-mode `〕` followed by
+`，` rendered with a full em of gap in Serif, whereas Sans rendered
+the same pair tightly squeezed. `」，` / `』，` continued to squeeze
+in both styles — the browser appears to allow-list "typical" CJK
+quotes/brackets for pairwise trim regardless of comma position, but
+fall back to a heuristic check for less-common closers like `〕`.
+When the comma is too far from the slot top, that heuristic rejects
+the pair.
+
+**Fix.** Ship a separate `vert_nudge.JP_SERIF = {}` (empty) and wire
+Serif to it in `build.py`. Serif's source position is already close
+enough to where Sans's nudged version ends up — no transform needed.
+Sans keeps its -120 nudge (different source baseline, still needs the
+push).
+
+The general rule that fell out: **vert nudges are per-style, not
+per-locale** — the source font's default vert-form metrics differ
+enough between Sans and Serif (and likely between locales' Noto CJK
+sources too) that any locale-wide nudge dict needs splitting per
+style as new variants come online.
+
 **To pick this up again**, things worth trying next:
 
 - Bypass `vert` entirely: emit a `ccmp` (always-on GSUB) substitution
