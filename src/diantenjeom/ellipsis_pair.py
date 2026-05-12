@@ -48,6 +48,8 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables as ot
 
+from diantenjeom._outline import shift_in_place
+
 
 # Distance (font units) by which to translate the ellipsis outline
 # downward. Source dots sit at y ~ 330-430 (em*0.4 centre); shifting by
@@ -157,22 +159,9 @@ def _clear_variation_entries(font: TTFont, glyph_name: str) -> None:
 
 
 def _shift_glyph_outline_in_place(font: TTFont, glyph_name: str, dy: int) -> None:
-    """Translate `glyph_name`'s CFF2 outline by (0, dy) and update vmtx
-    tsb to stay consistent with the new bbox top."""
-    if "CFF2" not in font:
-        return
-    charstrings = font["CFF2"].cff[0].CharStrings
-    if glyph_name not in charstrings.charStrings:
-        return
-    target_cs = charstrings[glyph_name]
-
-    glyph_set = font.getGlyphSet()
-    pen = T2CharStringPen(None, glyph_set, CFF2=True)
-    glyph_set[glyph_name].draw(TransformPen(pen, Transform().translate(0, dy)))
-    new_cs = pen.getCharString(private=target_cs.private, globalSubrs=target_cs.globalSubrs)
-
-    idx = charstrings.charStrings[glyph_name]
-    charstrings.charStringsIndex.items[idx] = new_cs
+    """Translate `glyph_name`'s CFF2 outline by (0, dy) preserving the
+    glyph's blend operators / variation data."""
+    shift_in_place(font, glyph_name, 0, dy)
     # vmtx tsb intentionally left at the source value (no recompute).
     # Tested both ways: tsb tracking the new bbox vs. left as-is made no
     # difference to Firefox's baseline placement in rotated Latin runs.

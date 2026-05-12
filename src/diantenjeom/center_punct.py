@@ -16,11 +16,9 @@ offset is small enough to be visually acceptable across all three.
 
 from __future__ import annotations
 
-from fontTools.misc.transform import Transform
-from fontTools.pens.boundsPen import BoundsPen
-from fontTools.pens.t2CharStringPen import T2CharStringPen
-from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
+
+from diantenjeom._outline import shift_in_place
 
 # Codepoints to shift. Locale-agnostic.
 JP: tuple[int, ...] = (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F)  # ! : ; ?
@@ -65,23 +63,9 @@ def _reachable_glyphs(font: TTFont, codepoint: int) -> set[str]:
 
 
 def _shift_outline(font: TTFont, glyph_name: str, dx: int) -> None:
-    """Translate `glyph_name`'s CFF2 outline by (dx, 0) and update hmtx
-    LSB to track the new bbox x_min."""
-    if "CFF2" not in font:
-        return
-    charstrings = font["CFF2"].cff[0].CharStrings
-    if glyph_name not in charstrings.charStrings:
-        return
-    target_cs = charstrings[glyph_name]
-
-    glyph_set = font.getGlyphSet()
-    pen = T2CharStringPen(None, glyph_set, CFF2=True)
-    glyph_set[glyph_name].draw(TransformPen(pen, Transform().translate(dx, 0)))
-    new_cs = pen.getCharString(private=target_cs.private, globalSubrs=target_cs.globalSubrs)
-
-    idx = charstrings.charStrings[glyph_name]
-    charstrings.charStringsIndex.items[idx] = new_cs
-
+    """Translate `glyph_name`'s CFF2 outline by (dx, 0) preserving blend
+    operators, and update hmtx LSB to track the new bbox x_min."""
+    shift_in_place(font, glyph_name, dx, 0)
     if glyph_name in font["hmtx"].metrics:
         adv, lsb = font["hmtx"].metrics[glyph_name]
         font["hmtx"].metrics[glyph_name] = (adv, lsb + dx)

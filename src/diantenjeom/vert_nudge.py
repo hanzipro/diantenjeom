@@ -30,11 +30,10 @@ the sign as needed so callers don't have to think about it.)
 
 from __future__ import annotations
 
-from fontTools.misc.transform import Transform
-from fontTools.pens.t2CharStringPen import T2CharStringPen
-from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables as ot
+
+from diantenjeom._outline import shift_in_place
 
 # Per-locale default offsets, in font units. Keep keys explicit and
 # locale-named so build.py can pick the right dict per Variant.
@@ -133,21 +132,9 @@ def _add_vkrn_singlepos(font: TTFont, offsets: dict[str, tuple[int, int]]) -> No
 
 
 def _shift_outline(font: TTFont, glyph_name: str, dy: int) -> None:
-    """Translate `glyph_name`'s CFF2 outline by (0, dy)."""
-    if "CFF2" not in font:
-        return
-    charstrings = font["CFF2"].cff[0].CharStrings
-    if glyph_name not in charstrings.charStrings:
-        return
-    target_cs = charstrings[glyph_name]
-
-    glyph_set = font.getGlyphSet()
-    pen = T2CharStringPen(None, glyph_set, CFF2=True)
-    glyph_set[glyph_name].draw(TransformPen(pen, Transform().translate(0, dy)))
-    new_cs = pen.getCharString(private=target_cs.private, globalSubrs=target_cs.globalSubrs)
-
-    target_idx = charstrings.charStrings[glyph_name]
-    charstrings.charStringsIndex.items[target_idx] = new_cs
+    """Translate `glyph_name`'s CFF2 outline by (0, dy) preserving the
+    glyph's blend operators / variation data."""
+    shift_in_place(font, glyph_name, 0, dy)
 
 
 def install(font: TTFont, nudges: dict[int, int]) -> None:
