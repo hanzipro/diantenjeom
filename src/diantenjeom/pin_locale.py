@@ -163,17 +163,20 @@ def _empty_orphan_lookups(table) -> None:
 
 
 def install(font: TTFont, extra_upright: tuple[int, ...] = ()) -> None:
-    for table_tag in ("GSUB", "GPOS"):
-        if table_tag not in font:
-            continue
-        table = font[table_tag].table
-        if table.ScriptList is None:
-            continue
-        for sr in table.ScriptList.ScriptRecord:
-            script = sr.Script
-            script.LangSysRecord = []
-            script.LangSysCount = 0
+    """Pin vert/vrt2 behaviour to JAN regardless of the document's OT
+    language tag, plus add identity self-subst for upright codepoints.
 
+    We deliberately do NOT strip non-default LangSysRecord entries from
+    Script tables. Chrome's text-spacing-trim consults the GSUB Script /
+    LangSys structure as part of its pair-squeeze classification, and
+    emptying every LangSysRecord disables the squeeze for every CJK
+    punctuation pair (was the silent break behind a long bisect).
+
+    Aliasing vert / vrt2 FeatureRecord LookupListIndex to JAN's lookup
+    list makes the LangSys strip redundant anyway: whichever LangSys
+    resolves for the document language, its vert FeatureRecord ends up
+    pointing at JAN's lookups (which we then mutate for upright_cps).
+    """
     if "GSUB" in font:
         gsub = font["GSUB"].table
         _alias_vert_to_jan(gsub)

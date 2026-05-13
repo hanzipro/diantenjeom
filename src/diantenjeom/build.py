@@ -45,6 +45,7 @@ from diantenjeom import (
     center_punct,
     codepoints,
     ellipsis_pair,
+    graft,
     pin_locale,
     rotate_quotes,
     vert_nudge,
@@ -104,6 +105,14 @@ class Variant:
     # upright in vertical mode). Centered / GB conventions keep ：upright;
     # JP rotates it. Default empty = behave as JP source.
     upright_cps: tuple[int, ...] = ()
+    # Diagnostic: pass ["*"] to KEEP every layout feature from source,
+    # bypassing the curated KEEP_FEATURES list. Used while bisecting
+    # which stripped feature breaks Chrome's pair-squeeze on Centered.
+    layout_features: tuple[str, ...] | None = None
+    # Optional secondary source for grafting specific codepoints' glyphs.
+    # Centered pulls 、，。 from TC to get the centred form.
+    graft_source: Path | None = None
+    graft_cps: tuple[int, ...] = ()
 
     @property
     def stem(self) -> str:
@@ -233,7 +242,7 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     font = TTFont(variant.source)
 
     opts = Options()
-    opts.layout_features = KEEP_FEATURES
+    opts.layout_features = list(variant.layout_features) if variant.layout_features else KEEP_FEATURES
     opts.name_IDs = ["*"]
     opts.name_legacy = True
     opts.name_languages = ["*"]
@@ -257,6 +266,8 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
     pin_locale.install(font, variant.upright_cps)
+    if variant.graft_source is not None and variant.graft_cps:
+        graft.install(font, variant.graft_source, variant.graft_cps)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
     ellipsis_pair.install(font)
@@ -360,21 +371,30 @@ def main() -> None:
         # divergence from JP is ：(U+FF1A) staying upright in vertical mode
         # (Chinese convention) instead of rotating 90° (JP convention).
         # 、，。centring and other Centered-specific adjustments to follow.
+        # Centered: TC-style centred 、，。 (grafted from Noto TC source),
+        # ：upright in vertical. bisect A: keep ALL layout features so the
+        # subsetter doesn't strip anything Chrome's pair-squeeze might need.
         Variant(
             punct="centered",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.JP,
-            vert_nudges=vert_nudge.JP,
-            upright_cps=(0xFF1A,),
+            vert_nudges={},
+            upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
+            layout_features=("*",),
+            graft_source=args.sources / "NotoSansCJKtc-VF.otf",
+            graft_cps=(0x3001, 0xFF0C, 0x3002),
         ),
         Variant(
             punct="centered",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.JP,
-            vert_nudges=vert_nudge.JP_SERIF,
-            upright_cps=(0xFF1A,),
+            vert_nudges={},
+            upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
+            layout_features=("*",),
+            graft_source=args.sources / "NotoSerifCJKtc-VF.otf",
+            graft_cps=(0x3001, 0xFF0C, 0x3002),
         ),
     ]
 

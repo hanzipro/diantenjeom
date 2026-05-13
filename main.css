@@ -69,4 +69,8 @@ article {
     --sans: 'Diantenjeom Sans Centered', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
     --serif: 'Diantenjeom Serif Centered', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
   }
+  &.binomoto {
+    --sans: 'Binomoto Sans', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif: 'Binomoto Serif', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+  }
 }
