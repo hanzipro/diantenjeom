@@ -118,6 +118,37 @@ font.glyphOrder = list(cff2.charset)
 1. **Chrome 改實作**：text-spacing-trim 應該基於 Unicode 屬性（East Asian Width、line break class），不該綁特定 GSUB 結構。可向 Chromium 提 bug。
 2. **我們的 subset 完全模仿 Noto 結構**：保留所有 locl、所有 LangSys、不動任何 locl target glyph。這就是目前的妥協 — 代價是上述 codepoint 被 ZHT locl 替換。
 
+## 後記：不是 Noto 指紋，是 halt coverage 要求（2026-05-13 調査）
+
+之前說「Noto fingerprint」其實不對。查了 W3C / Chrome / MDN 文件後修正：
+
+- **Chrome 的明確規範**：text-spacing-trim 要 fire 必須字體有 `halt`（或 `chws`） OpenType feature。沒有就整個 disabled。這是 spec 層級的字體層級檢查，不是 Noto 衍生檢查。
+- **真正的隱含要求（推測）**：Chrome 的 halt 套用發生在 **GSUB shaping 之後** — 對 post-locl 的 glyph 找 halt coverage。Noto CJK 的 halt coverage 既包含原 cmap glyph（`uniFF0C`）又包含 locl 替代後的 glyph（`glyph00096`），所以無論 locl 有沒 fire 都能順利套 halt。我們動 locl mapping、換 locl target outline、或加新 glyph 改 cmap，會讓 post-shape 的某些 glyph 落在 halt coverage 外，Chrome 似乎是 **all-or-nothing**（偵測到任何關鍵 codepoint 的 post-shape glyph 缺 halt 就整個 font 關掉 trim）。
+
+這個假設**部分驗證、部分被推翻**（2026-05-13 實驗）：
+
+- ✅ Dump vanilla Noto JP halt coverage 確認包含 10 個 locl target 中的 9 個
+- ✅ Subset 後我們的 Centered build halt coverage 也仍包含 9/10 locl targets
+- ❌ cmap-reroute 加新 glyph + **同步把新 clone 加進 halt coverage**（含 Format 2 SubTable 的 per-glyph value 處理）→ Chrome 橫排 trim **仍然不 fire**
+
+所以 gate **不只是 halt coverage**。比 halt coverage 更深的還有別的條件 — 可能是：
+
+- cmap-pointed glyph 跟 locl source coverage glyph 必須是同一個 glyph
+- 或 HarfBuzz 完成 shaping 後對結果 glyph 序列做特定檢查（class、bbox、跟 Unicode property 的 cross check）
+- 或 Chrome 對 font 做 shaping-based fingerprint（送 test sequence 看 output 對不對）
+
+要再深查得跳進 Chromium / HarfBuzz source code（`HarfBuzzShaper`, `text-spacing-trim` 的 font property 判斷邏輯）。在那之前**暫停這條路**。
+
+**對自己從零設計的字體：** 完全沒有 Noto-specific 的問題。只要字體有 halt 且對所有需要 trim 的 codepoint（更精確：post-GSUB-shaping 的目標 glyph）有 halt coverage，就會 work。
+
+### 參考資料
+
+- [Chrome Intent to Ship: text-spacing-trim](https://groups.google.com/a/chromium.org/g/blink-dev/c/jVUR2ebE3e0)
+- [W3C csswg-drafts #8293 — halt/vhal/chws/vchw discussion](https://github.com/w3c/csswg-drafts/issues/8293)
+- [W3C csswg-drafts #9504 — closing punctuation classes](https://github.com/w3c/csswg-drafts/issues/9504)
+- [MDN text-spacing-trim](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-spacing-trim)
+- [Chrome blog: CSS i18n features](https://developer.chrome.com/blog/css-i18n-features)
+
 ## 不要再嘗試以下
 
 - 從 KEEP_FEATURES 移除 locl
