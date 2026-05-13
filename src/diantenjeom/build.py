@@ -109,10 +109,11 @@ class Variant:
     # bypassing the curated KEEP_FEATURES list. Used while bisecting
     # which stripped feature breaks Chrome's pair-squeeze on Centered.
     layout_features: tuple[str, ...] | None = None
-    # Optional secondary source for grafting specific codepoints' glyphs.
-    # Centered pulls 、，。 from TC to get the centred form.
-    graft_source: Path | None = None
-    graft_cps: tuple[int, ...] = ()
+    # Optional grafts: tuples of (secondary_source, codepoints). Each
+    # pair grafts those codepoints' cmap glyphs (CharString + vmtx +
+    # VORG) from the named source. Centered grafts 、，。 from TC to
+    # get the centred form.
+    grafts: tuple[tuple[Path, tuple[int, ...]], ...] = ()
 
     @property
     def stem(self) -> str:
@@ -266,8 +267,9 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
     pin_locale.install(font, variant.upright_cps)
-    if variant.graft_source is not None and variant.graft_cps:
-        graft.install(font, variant.graft_source, variant.graft_cps)
+    for graft_source, graft_cps in variant.grafts:
+        if graft_cps:
+            graft.install(font, graft_source, graft_cps)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
     ellipsis_pair.install(font)
@@ -386,8 +388,9 @@ def main() -> None:
             vert_nudges={},
             upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
             layout_features=("*",),
-            graft_source=args.sources / "NotoSansCJKtc-VF.otf",
-            graft_cps=(0x3001, 0xFF0C, 0x3002),
+            grafts=(
+                (args.sources / "NotoSansCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
+            ),
         ),
         Variant(
             punct="centered",
@@ -397,8 +400,9 @@ def main() -> None:
             vert_nudges={},
             upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
             layout_features=("*",),
-            graft_source=args.sources / "NotoSerifCJKtc-VF.otf",
-            graft_cps=(0x3001, 0xFF0C, 0x3002),
+            grafts=(
+                (args.sources / "NotoSerifCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
+            ),
         ),
     ]
 

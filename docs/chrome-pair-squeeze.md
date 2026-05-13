@@ -80,11 +80,34 @@ Chrome 的 `text-spacing-trim` 對 CJK 標點配對擠壓是否啟動，**整個
 
 **為何失敗**：這是最反直覺的一個 — Chrome 連 locl target glyph 的 outline 都檢查。改了就 font-wide 失效。
 
+（2026-05-13 retry 確認：再做一次同樣的 alias，視覺上 `．` 確實變回 JP corner，但 `〕，` 跟 `，「` 也同步失去擠壓。Gate 真實存在，現象可重現。）
+
 ### 6. cmap reroute（add new glyph + 改 cmap target）
 
 新增 `uniFF0E_jp` glyph（copy `uniFF0E` outline），改 cmap 讓 `U+FF0E → uniFF0E_jp`。locl 看不到 `uniFF0E_jp`，不會 fire。其他 locl 完整保留。
 
-**為何沒做成**：fontTools 對 CFF2 font 新增 glyph 不是 trivial — 直接 `charstrings[new_name] = new_cs` + `font.setGlyphOrder()` 沒有正確把 glyph 寫入輸出。需要更深入處理 CFF2 charset / charStringsIndex。理論上可行，但工作量大，且不確定 Chrome 對「沒被任何 locl 引用的 cmap target」會不會也 fail。
+**最後實作完整版**（2026-05-13）：
+- `cmap_reroute.add_cmap_alias()` 正確處理 CFF2 add-glyph：append 到 `charStringsIndex.items` + 註冊 `charStrings[name]` + `topDict.charset.append` + `FDSelect.gidArray.append` + 補 HVAR/VVAR `VarIdxMap` 條目 + 更新所有 cmap subtable。
+- Build 成功、新 glyph 在 font 裡、cmap 正確 reroute。視覺上 `．` 橫排確實變回 JP corner。
+- 但：(a) Chrome 橫排 pair-squeeze **掛了**（連 `〕，` 也不擠壓）。(b) 直排 `．` 沒走 vert 替代（新 glyph 不在 vert lookup coverage 內），顯示成橫排形。
+
+**結論**：Chrome 的 gate 比想像更嚴 — 它不只看 locl 表的 mapping 與 target outline，連 glyph 數、cmap-source 是否與 locl-source 是同一個 glyph、font 整體結構是否「乾淨」都可能在檢查。**任何結構偏離 vanilla Noto CJK 都會關閉 gate**。
+
+實作放棄了（commit 前刪除了 `src/diantenjeom/cmap_reroute.py`），但 fontTools CFF2 add-glyph 機制研究成果記在這裡：
+
+```python
+# Add a glyph to a CFF2 font (works for save/reload):
+cff2 = font["CFF2"].cff.topDictIndex[0]
+cs = cff2.CharStrings
+new_idx = len(cs.charStringsIndex.items)
+cs.charStringsIndex.items.append(new_charstring)
+cs.charStrings[new_name] = new_idx
+cff2.charset.append(new_name)
+cff2.FDSelect.gidArray.append(src_fd_index)
+font.glyphOrder = list(cff2.charset)
+# Also: hmtx/vmtx/VORG entries, HVAR/VVAR VarIdxMap entries for every map
+# (AdvWidthMap, LsbMap, AdvHeightMap, TsbMap, VOrgMap, ...) where the map exists
+```
 
 ## 哲學
 
@@ -100,8 +123,9 @@ Chrome 的 `text-spacing-trim` 對 CJK 標點配對擠壓是否啟動，**整個
 - 從 KEEP_FEATURES 移除 locl
 - 修改 locl SingleSubst 的 mapping 內容（增、刪、改）
 - 修改 locl target glyph 的 CharString / hmtx / vmtx / VORG
+- 在 font 裡新增 glyph（即使只是 cmap 重指過去、原 glyph 保留也算）
 
-任何一個都會關掉 Chrome 橫排的 CJK 標點擠壓，且無預警 — Chrome devtools 不會告訴你 trim 為什麼沒 fire。
+任何一個都會關掉 Chrome 橫排的 CJK 標點擠壓，且無預警 — Chrome devtools 不會告訴你 trim 為什麼沒 fire。Chrome 的 gate 看起來是「font 必須結構性等價於某種 vanilla Noto CJK fingerprint」。
 
 ## 相關 commit / branch
 
