@@ -48,6 +48,30 @@ change. More docs and examples to come.
 
 ## TODO
 
+- **File the Chromium bug.** `docs/chromium-bug-report-draft.md` has a
+  ready-to-paste draft. Findings to land:
+  - `text-spacing-trim` is **not** a Noto-fingerprint check. It's
+    `han_kerning.cc:CharTypeFromBounds()` running a type-consistency
+    check across the four "dot" characters in `kChars`:
+    `、 (U+3001)`, `。 (U+3002)`, `，(U+FF0C)`, `．(U+FF0E)`. After
+    shaping (locl applied), the four glyphs' bboxes must classify to
+    the same `CharType` (`kClose` / `kMiddle` / `kOpen` / `kOther`).
+    If they don't, `has_alternative_spacing = false` and trim is
+    disabled **font-wide** (not just for the disagreeing glyph).
+  - A from-scratch custom font is unaffected, **provided the four
+    dots are designed consistently** — all corner-attached or all
+    centred. Mixed-design subsets (Diantenjeom Centered's case: TC
+    centred `、/。/，` + JP corner `．`) trigger the gate.
+  - Suggested fixes in the draft, in order of effort: surface the
+    gate to DevTools → downgrade per-group instead of font-wide →
+    replace bbox classification with Unicode-property-based
+    classification (which matches the spec) → opt-in OpenType feature
+    tag for designer self-certification.
+  - When filing, swap the placeholder repo URL in the draft for the
+    actual GitHub URL of this project. Target component:
+    `Blink>Fonts>Shaping`.
+
+
 - **Collapse per-style files into one shared subset.** The Noto CJK source
   carries `locl` GSUB rules that map the same Unicode punctuation to different
   glyph forms per OT language tag (JAN / ZHT / ZHS / KOR), so a single subset
