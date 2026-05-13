@@ -170,7 +170,8 @@ def install(font: TTFont, extra_upright: tuple[int, ...] = ()) -> None:
     Script tables. Chrome's text-spacing-trim consults the GSUB Script /
     LangSys structure as part of its pair-squeeze classification, and
     emptying every LangSysRecord disables the squeeze for every CJK
-    punctuation pair (was the silent break behind a long bisect).
+    punctuation pair across the whole font. See
+    `docs/chrome-pair-squeeze.md` for the bisect that pinned this down.
 
     Aliasing vert / vrt2 FeatureRecord LookupListIndex to JAN's lookup
     list makes the LangSys strip redundant anyway: whichever LangSys

@@ -372,8 +372,12 @@ def main() -> None:
         # (Chinese convention) instead of rotating 90° (JP convention).
         # 、，。centring and other Centered-specific adjustments to follow.
         # Centered: TC-style centred 、，。 (grafted from Noto TC source),
-        # ：upright in vertical. bisect A: keep ALL layout features so the
-        # subsetter doesn't strip anything Chrome's pair-squeeze might need.
+        # ：upright in vertical. Keep ALL layout features — Chrome's
+        # text-spacing-trim requires the source's `locl` feature to be
+        # present AND its mappings + target glyph outlines untouched, or
+        # pair-squeeze disables across the whole font. The side effect
+        # is ZHT locl swaps under lang="zh-Hant" (．/！/？/：/；/etc.).
+        # See docs/chrome-pair-squeeze.md.
         Variant(
             punct="centered",
             style="sans",
