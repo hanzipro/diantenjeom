@@ -131,13 +131,87 @@ font.glyphOrder = list(cff2.charset)
 - ✅ Subset 後我們的 Centered build halt coverage 也仍包含 9/10 locl targets
 - ❌ cmap-reroute 加新 glyph + **同步把新 clone 加進 halt coverage**（含 Format 2 SubTable 的 per-glyph value 處理）→ Chrome 橫排 trim **仍然不 fire**
 
-所以 gate **不只是 halt coverage**。比 halt coverage 更深的還有別的條件 — 可能是：
+所以 gate **不只是 halt coverage**。深挖 Chromium source 後找到真正的 gate（見下節）。
 
-- cmap-pointed glyph 跟 locl source coverage glyph 必須是同一個 glyph
-- 或 HarfBuzz 完成 shaping 後對結果 glyph 序列做特定檢查（class、bbox、跟 Unicode property 的 cross check）
-- 或 Chrome 對 font 做 shaping-based fingerprint（送 test sequence 看 output 對不對）
+## 確診：Chromium `han_kerning.cc` 的型別一致性檢查（2026-05-13）
 
-要再深查得跳進 Chromium / HarfBuzz source code（`HarfBuzzShaper`, `text-spacing-trim` 的 font property 判斷邏輯）。在那之前**暫停這條路**。
+Chromium source: `third_party/blink/renderer/platform/fonts/shaping/han_kerning.cc`
+
+關鍵流程：
+
+1. Chrome shape 一個固定的 10-codepoint 序列（`kChars`）：
+
+   ```cpp
+   const UChar kChars[] = {
+       kIdeographicComma,        // 、 (U+3001)
+       kIdeographicFullStop,     // 。 (U+3002)
+       kFullwidthComma,          // ， (U+FF0C)
+       kFullwidthFullStop,       // ． (U+FF0E)
+       kFullwidthColon,          // ： (U+FF1A)
+       kFullwidthSemicolon,      // ； (U+FF1B)
+       kLeftDoubleQuotationMark, // " (U+201C)
+       kLeftSingleQuotationMark, // ' (U+2018)
+       kRightDoubleQuotationMark,// " (U+201D)
+       kRightSingleQuotationMark // ' (U+2019)
+   };
+   ```
+
+   shape 用真實的 locale（文件 lang）— 所以 `locl` 會 fire。
+
+2. 把 shape 結果分組分類：
+   - **dots group** (4 個): 、 。 ， ．
+   - **colon** (1 個): ：
+   - **semicolon** (1 個): ；
+   - **quotes** (4 個): " ' " '
+
+3. 對每組用 `CharTypeFromBounds()` 算 glyph 的 type：
+
+   ```cpp
+   if (bound.right() <= half_em) return kClose;   // ink 在左半（JP 倚角）
+   if (bound.left() >= half_em) return kOpen;     // ink 在右半
+   if (bound.width() <= half_em && bound.left() >= half_em / 2)
+       return kMiddle;                            // 細小、置中
+   return kOther;
+   ```
+
+4. **關鍵**：dots group 4 個字符要 shape 完都產生**同型別**的 glyph，才能跑 trim。若任一個型別跟其他不同 → 整組變 `kOther` → `has_alternative_spacing = false` → **全 font 不 trim**。
+
+### 為什麼 Centered + `．` JP 化必然失敗
+
+| codepoint | baseline (work) post-locl glyph | cmap-reroute (broken) post-locl |
+|---|---|---|
+| 、 | ZHT centered → kMiddle | ZHT centered → kMiddle |
+| 。 | ZHT centered → kMiddle | ZHT centered → kMiddle |
+| ， | ZHT centered → kMiddle | ZHT centered → kMiddle |
+| ． | ZHT centered → kMiddle | JP corner (locl 抓不到 clone) → **kClose** |
+
+baseline 四 dot 全 kMiddle（一致），trim work。任何讓 `．` 變成跟其他 3 個不同型別的修改 — alias outline / cmap reroute / remove FF0E from locl / identity self-subst — 都會讓 dots group 變成 kOther。
+
+### 設計層面的意涵
+
+- Chrome 的 trim 設計**假設字體設計者把 4 個 dot 視為一組**：要嘛全 JP 倚角，要嘛全 ZHT 置中，不能混。
+- 自己拉曲線的字體完全沒問題，只要 4 個 dot（跟 colons / quotes 各組內部）**設計上一致**即可。
+- Noto CJK 的 ZHT locl 把 4 個 dot 全替換成置中版，所以 `lang="zh-Hant"` 環境下 4 個 dot 都是 kMiddle。
+- 我們的 Centered：graft 把 `、/。/，` 換成 TC 置中，但 `．` 沒 graft、locl 仍替換成 ZHT 置中 — 4 個還是一致。視覺上 `．` 是 ZHT 置中，**這是 Chrome trim 強制的設計約束**。
+
+### 對其他組的影響
+
+`：;` 在 Centered 經 center_punct 平移 -50 後 bbox (-50, 0, 506, 684)：
+- bound.right() = 506 > 500 → 不是 kClose
+- bound.left() = -50 < 500 → 不是 kOpen
+- width = 556 > 500 → 不是 kMiddle
+- → **kOther**
+
+也就是說 `：` / `；` 在我們的 build 本來就是 kOther — Chrome 對這兩個的 pair-squeeze 行為很可能也跟 vanilla Noto 不同。實測中使用者報告 `：「` 有擠壓，可能是因為 colon / semicolon 是「per-char group」而非「dots group」— 即使它自己 kOther 也只影響它一個，不會 cascade 關掉整個 font 的 trim。
+
+### 結論
+
+**4 個 dot 必須同型別**。要 `．` JP 倚角，唯一辦法是另外 3 個 dot 也撤回 JP 倚角（放棄 Centered 的視覺）。或者向 Chromium 提 bug，主張這個檢查太嚴格。
+
+### 參考資料
+
+- [Chromium han_kerning.cc](https://chromium.googlesource.com/chromium/src/+/HEAD/third_party/blink/renderer/platform/fonts/shaping/han_kerning.cc)
+- [Chromium text_spacing_trim.h](https://chromium.googlesource.com/chromium/src/+/HEAD/third_party/blink/renderer/platform/fonts/shaping/text_spacing_trim.h)
 
 **對自己從零設計的字體：** 完全沒有 Noto-specific 的問題。只要字體有 halt 且對所有需要 trim 的 codepoint（更精確：post-GSUB-shaping 的目標 glyph）有 halt coverage，就會 work。
 
