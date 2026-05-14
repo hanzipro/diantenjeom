@@ -114,6 +114,15 @@ class Variant:
     # VORG) from the named source. Centered grafts 、，。 from TC to
     # get the centred form.
     grafts: tuple[tuple[Path, tuple[int, ...]], ...] = ()
+    # CSS-side delegation: emit a second @font-face under the same
+    # family name that serves `css_delegate_cps` from a sibling
+    # variant's woff2. Used by Centered to keep ．(FF0E) as JP-corner
+    # while the rest of the family stays TC-centred — see
+    # docs/chrome-pair-squeeze.md for why this side-steps Chrome's
+    # han_kerning consistency check (each @font-face passes the gate
+    # internally with its own consistent dot group).
+    css_delegate_donor_stem: str | None = None
+    css_delegate_cps: tuple[int, ...] = ()
 
     @property
     def stem(self) -> str:
@@ -323,19 +332,43 @@ def _unicode_range(unicodes: list[int]) -> str:
     return ", ".join(parts)
 
 
+def _face_block(family: str, stem: str, wmin: int, wmax: int, unicodes: list[int]) -> str:
+    return (
+        "@font-face {\n"
+        f"  font-family: '{family}';\n"
+        f"  src: url('./fonts/{stem}.woff2') format('woff2-variations');\n"
+        f"  font-weight: {wmin} {wmax};\n"
+        "  font-display: swap;\n"
+        f"  unicode-range: {_unicode_range(unicodes)};\n"
+        "}"
+    )
+
+
 def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
+    weight_by_stem = {v.stem: wr for v, wr in entries}
     blocks: list[str] = []
     for v, (wmin, wmax) in entries:
-        url = f"./fonts/{v.stem}.woff2"
-        blocks.append(
-            "@font-face {\n"
-            f"  font-family: '{v.family}';\n"
-            f"  src: url('{url}') format('woff2-variations');\n"
-            f"  font-weight: {wmin} {wmax};\n"
-            "  font-display: swap;\n"
-            f"  unicode-range: {_unicode_range(v.unicodes)};\n"
-            "}"
-        )
+        # Main face — exclude any codepoints delegated to a sibling
+        # variant's font file via @font-face unicode-range split.
+        main_cps = [cp for cp in v.unicodes if cp not in v.css_delegate_cps]
+        blocks.append(_face_block(v.family, v.stem, wmin, wmax, main_cps))
+        # Delegated face(s) — same family name, different woff2 + a
+        # narrow unicode-range. Lets the browser pick the donor's glyph
+        # for the delegated codepoints while leaving Chrome's per-face
+        # han_kerning trim qualification intact (each face's four-dot
+        # group stays internally consistent).
+        if v.css_delegate_cps and v.css_delegate_donor_stem:
+            donor_stem = v.css_delegate_donor_stem
+            donor_wmin, donor_wmax = weight_by_stem.get(donor_stem, (wmin, wmax))
+            blocks.append(
+                _face_block(
+                    v.family,
+                    donor_stem,
+                    donor_wmin,
+                    donor_wmax,
+                    list(v.css_delegate_cps),
+                )
+            )
     out = DIST / "diantenjeom.css"
     out.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
     return out
@@ -391,6 +424,11 @@ def main() -> None:
             grafts=(
                 (args.sources / "NotoSansCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
             ),
+            # ．(FF0E) delegated to the JP-default sans woff2 via the
+            # @font-face unicode-range split — keeps ．JP-corner without
+            # tripping Chrome's han_kerning four-dot consistency gate.
+            css_delegate_donor_stem="diantenjeom-sans",
+            css_delegate_cps=(0xFF0E,),
         ),
         Variant(
             punct="centered",
@@ -403,6 +441,8 @@ def main() -> None:
             grafts=(
                 (args.sources / "NotoSerifCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
             ),
+            css_delegate_donor_stem="diantenjeom-serif",
+            css_delegate_cps=(0xFF0E,),
         ),
     ]
 

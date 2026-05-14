@@ -206,7 +206,40 @@ baseline 四 dot 全 kMiddle（一致），trim work。任何讓 `．` 變成跟
 
 ### 結論
 
-**4 個 dot 必須同型別**。要 `．` JP 倚角，唯一辦法是另外 3 個 dot 也撤回 JP 倚角（放棄 Centered 的視覺）。或者向 Chromium 提 bug，主張這個檢查太嚴格。
+**4 個 dot 在同一個 font face 裡必須同型別**。要 `．` JP 倚角，又要 `、/。/，` TC 置中，**字體側**做不到 — 但**CSS 側**可以。
+
+### 解法（2026-05-14）：用 `@font-face` `unicode-range` 切割
+
+不在一個 font file 裡混風格，改成**兩個 font file、同一個 family name、用 `unicode-range` 切割 codepoint**：
+
+```css
+/* Centered woff2 服務 codepoints 中除 FF0E 之外的所有 */
+@font-face {
+  font-family: 'Diantenjeom Sans Centered';
+  src: url('./fonts/diantenjeom-sans-centered.woff2') format('woff2-variations');
+  unicode-range: U+...,  U+FF0C-FF0D, U+FF0F, U+...;  /* 缺 U+FF0E */
+}
+
+/* JP-default woff2 補上 FF0E */
+@font-face {
+  font-family: 'Diantenjeom Sans Centered';  /* 同 family name */
+  src: url('./fonts/diantenjeom-sans.woff2') format('woff2-variations');
+  unicode-range: U+FF0E;
+}
+```
+
+**為什麼會 work**：Chrome 的 `han_kerning` consistency check 是**對每個 font face 個別跑**的，不是對最終 rendered 字串。
+
+- `diantenjeom-sans-centered.woff2`：4 個 dot 全 ZHT 置中（kMiddle）→ 自己內部一致 → trim qualified
+- `diantenjeom-sans.woff2`：4 個 dot 全 JP 倚角（kClose）→ 自己內部一致 → trim qualified
+
+兩個 face 都各自過 gate，rendered 文字 cmap 到不同 face 也都會 trim。Chrome 不 cross-check 「兩個 face 加起來型別會不會打架」。
+
+**設計約束**：兩個 donor woff2 都得單獨能過 gate（內部 4 dot 一致）。我們的 JP-default 跟 Centered 各自都符合。
+
+### 對自己拉曲線的字體
+
+完全沒有 Noto 相關問題。如果想 ship 一個「混風格」punctuation font（4 dot 不一致），用 `@font-face` `unicode-range` 切成多個 woff2 就行，每個內部一致。CSS 層的拼接 Chrome 不會追究。
 
 ### 參考資料
 
