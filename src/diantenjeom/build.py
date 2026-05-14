@@ -44,6 +44,7 @@ INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
 from diantenjeom import (
     center_punct,
     codepoints,
+    dash_center,
     ellipsis_pair,
     graft,
     pin_locale,
@@ -281,6 +282,7 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
             graft.install(font, graft_source, graft_cps)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
+    dash_center.install(font)
     ellipsis_pair.install(font)
     # Brute-force horizontal shift on ! : ; ? to compensate for the
     # Chrome/Safari ~10% cross-axis right offset on these glyphs (see

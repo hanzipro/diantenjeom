@@ -380,6 +380,42 @@ Both changes were reverted; `rotate_quotes.ROTATE_CONFIGS` no longer
 includes `0x2014` / `0x2E3A`. The font now ships the dashes as-is from
 Noto CJK, matching Hiragino's (also off-centre) behaviour.
 
+### Update (2026-05-14): resolved by raw cmap-outline shift
+
+The earlier attempts all went through GSUB (`vert` substitution to a
+pre-rotated alternate, or `rotate_quotes`-style ROTATE_CONFIGS). They
+hit UTR50 R-class semantics: Chrome and Firefox ignore `vert` /
+`vrt2` for R-class codepoints and rotate the source glyph themselves;
+Safari applies the substitution inconsistently. As long as we expected
+the engine to honour our substitution, we couldn't move the dash.
+
+We sidestepped the entire GSUB layer by **modifying the cmap glyph's
+outline directly** — `dash_center.py` prepends an `0 dy rmoveto` to
+the CharString of both `emdash` and `uni2E3A` (`dy = +105`), then
+clears their HVAR / VVAR variation entries so wght-axis interpolation
+doesn't re-drift the position. Effect:
+
+- **Horizontal**: ink y_center moves from 275 (Latin x-height middle,
+  inherited from Noto's Latin design) to 380 — matches a CJK character's
+  body centre (`中` y_center = 381). The dashes now align with the
+  surrounding character line.
+- **Vertical**: UTR50 R-class browsers still auto-rotate the source
+  outline, but because the source outline is itself shifted, the
+  rotated position lands at the corresponding new centre axis. The
+  off-centre / mid-`——`-gap symptoms from the earlier rotate_quotes
+  attempt don't recur because we're not introducing a separate rotated
+  alternate glyph — engines get exactly the cmap outline they expect,
+  just at a different y.
+
+Why this works where GSUB approaches didn't: an engine can ignore an
+alternate-glyph substitution, but it cannot ignore the outline of the
+glyph it's already chosen to render.
+
+Ellipsis (`…`) is intentionally left alone — `ellipsis_pair.py`'s
+"single Latin-low, paired CJK-centred" design is correct per
+Latin / CJK typesetting conventions, and the single case sitting on
+the Latin baseline is what the user wants for mixed-script paragraphs.
+
 ## Per-style vert nudges: Sans and Serif need different `，`/`、` offsets
 
 The `vert_nudge.JP` dict (`{0x3001: -120, 0xFF0C: -120}`) was tuned
