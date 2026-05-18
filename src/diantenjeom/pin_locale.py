@@ -1,5 +1,5 @@
-"""Pin the JP subset to behave as JP regardless of the document's OT
-language tag.
+"""Pin the JP-source subset to behave as a specific OT LangSys regardless
+of the document's HTML lang attribute.
 
 Why this exists
 ---------------
@@ -11,11 +11,13 @@ set. A page with `lang="zh-Hant"` resolves to the ZHT LangSys, which in
 JP's source font omits the colon-rotation lookup (Chinese vertical
 typesetting traditionally keeps the colon stacked, not rotated).
 
-For a JP-locale subset we want every page — regardless of `lang` — to
-render with JP conventions. The cleanest way is to strip every
-non-default LangSysRecord from each Script. With no language-specific
-override present, every OT language falls back to DefaultLangSys, which
-holds the JAN-style vert / vrt2 wiring we want.
+For a JP-style subset we want every page — regardless of `lang` — to
+render with JAN's wiring. For an SC/mainland subset we want every page
+to render with ZHS's wiring (FE13-FE16 presentation forms for the four
+non-rotated puncts plus FE41-FE44 vertical brackets). The cleanest way
+is to alias every vert/vrt2 feature record to the chosen LangSys's
+lookup list, so whichever LangSys resolves at runtime, the resulting
+vertical-substitution behaviour is identical.
 """
 
 from __future__ import annotations
@@ -30,41 +32,55 @@ from fontTools.ttLib import TTFont
 _LOCALE_VARIANT_TAGS = ("vert", "vrt2")
 
 
-def _jan_vert_lookups(table) -> list[int] | None:
-    """Return the lookup list that DefaultLangSys's `vert` feature uses
-    (i.e. JAN convention — what JP renders in vertical mode)."""
+def _locale_vert_lookups(table, locale: str) -> list[int] | None:
+    """Return the lookup list that `locale`'s `vert` feature uses.
+
+    `locale="JAN"` resolves to DefaultLangSys (Noto CJK Source Han uses
+    JAN as the script default). Anything else walks LangSysRecord for a
+    matching `LangSysTag`. Returns `None` if no match.
+    """
     feature_list = table.FeatureList.FeatureRecord
     for sr in table.ScriptList.ScriptRecord:
-        ds = sr.Script.DefaultLangSys
-        if ds is None:
+        target_langsys = None
+        if locale == "JAN":
+            target_langsys = sr.Script.DefaultLangSys
+        else:
+            for lr in sr.Script.LangSysRecord:
+                # OT LangSysTag is 4 bytes, space-padded (e.g. "ZHS ").
+                if lr.LangSysTag.strip() == locale:
+                    target_langsys = lr.LangSys
+                    break
+        if target_langsys is None:
             continue
-        for fi in ds.FeatureIndex:
+        for fi in target_langsys.FeatureIndex:
             if feature_list[fi].FeatureTag == "vert":
                 return list(feature_list[fi].Feature.LookupListIndex)
     return None
 
 
-def _alias_vert_to_jan(table) -> None:
-    """Rewrite every vert AND vrt2 feature record to reference JAN's vert
-    lookup list.
+def _alias_vert_to_locale(table, locale: str) -> None:
+    """Rewrite every vert AND vrt2 feature record to reference `locale`'s
+    vert lookup list.
 
     Why touch vrt2: Safari/CoreText prefers vrt2 over vert. The source's
-    vrt2 only has [4, 9] which doesn't include the colon-rotation lookup
-    that JAN's vert provides via #5, so Safari skips rotating `：`. Pinning
-    vrt2 to JAN's superset gets Safari and Chrome aligned.
+    per-LangSys vrt2 lookup lists are subsets of the corresponding vert
+    lists (often only [49] — the generic CJK shared substitutions). To
+    keep all three browsers aligned, point vrt2 at the same lookups as
+    vert.
 
-    Why NOT a union of all vert/vrt2 records: the KOR/ZHS-specific records
-    also substitute `；！？` (rotated), which is wrong under JP convention
-    where only `：` should rotate. Pulling JAN's list specifically pins JP
-    behaviour cleanly.
+    Why NOT a union of all vert/vrt2 records: the KOR/ZHS/ZHT-specific
+    records substitute different glyphs for the same codepoints (e.g.
+    ZHS sends `:!;?` to FE13-FE16 presentation forms, JAN sends `：` to
+    a JP-rotated form). Unioning would chain incompatible substitutions.
+    Pinning to a single LangSys keeps the substitution flow coherent.
     """
-    jan = _jan_vert_lookups(table)
-    if not jan:
+    lookups = _locale_vert_lookups(table, locale)
+    if not lookups:
         return
     for fr in table.FeatureList.FeatureRecord:
         if fr.FeatureTag in _LOCALE_VARIANT_TAGS:
-            fr.Feature.LookupListIndex = list(jan)
-            fr.Feature.LookupCount = len(jan)
+            fr.Feature.LookupListIndex = list(lookups)
+            fr.Feature.LookupCount = len(lookups)
 
 
 # Tr-class codepoints (UTR50) that JP convention keeps upright in
@@ -106,22 +122,12 @@ def _force_upright(font: TTFont, table, codepoints: tuple[int, ...]) -> None:
                         st.mapping[g] = g
 
 
-def _add_upright_self_substs(font: TTFont, table, extras: tuple[int, ...] = ()) -> None:
+def _add_upright_self_substs(
+    font: TTFont, table, locale: str, extras: tuple[int, ...] = ()
+) -> None:
     cmap = font.getBestCmap()
-    feature_list = table.FeatureList.FeatureRecord
 
-    # Find JAN's vert lookup list.
-    jan_lookups: list[int] | None = None
-    for sr in table.ScriptList.ScriptRecord:
-        ds = sr.Script.DefaultLangSys
-        if ds is None:
-            continue
-        for fi in ds.FeatureIndex:
-            if feature_list[fi].FeatureTag == "vert":
-                jan_lookups = list(feature_list[fi].Feature.LookupListIndex)
-                break
-        if jan_lookups:
-            break
+    jan_lookups = _locale_vert_lookups(table, locale)
     if not jan_lookups:
         return
 
@@ -162,9 +168,14 @@ def _empty_orphan_lookups(table) -> None:
                 st.mapping = {}
 
 
-def install(font: TTFont, extra_upright: tuple[int, ...] = ()) -> None:
-    """Pin vert/vrt2 behaviour to JAN regardless of the document's OT
-    language tag, plus add identity self-subst for upright codepoints.
+def install(
+    font: TTFont,
+    extra_upright: tuple[int, ...] = (),
+    pin_to_locale: str = "JAN",
+) -> None:
+    """Pin vert/vrt2 behaviour to `pin_to_locale` regardless of the
+    document's OT language tag, plus add identity self-subst for upright
+    codepoints.
 
     We deliberately do NOT strip non-default LangSysRecord entries from
     Script tables. Chrome's text-spacing-trim consults the GSUB Script /
@@ -173,14 +184,15 @@ def install(font: TTFont, extra_upright: tuple[int, ...] = ()) -> None:
     punctuation pair across the whole font. See
     `docs/chrome-pair-squeeze.md` for the bisect that pinned this down.
 
-    Aliasing vert / vrt2 FeatureRecord LookupListIndex to JAN's lookup
-    list makes the LangSys strip redundant anyway: whichever LangSys
-    resolves for the document language, its vert FeatureRecord ends up
-    pointing at JAN's lookups (which we then mutate for upright_cps).
+    Aliasing vert / vrt2 FeatureRecord LookupListIndex to the chosen
+    LangSys's lookup list makes the LangSys strip redundant anyway:
+    whichever LangSys resolves for the document language, its vert
+    FeatureRecord ends up pointing at the same lookups (which we then
+    mutate for upright_cps).
     """
     if "GSUB" in font:
         gsub = font["GSUB"].table
-        _alias_vert_to_jan(gsub)
+        _alias_vert_to_locale(gsub, pin_to_locale)
         _force_upright(font, gsub, extra_upright)
-        _add_upright_self_substs(font, gsub, extra_upright)
+        _add_upright_self_substs(font, gsub, pin_to_locale, extra_upright)
         _empty_orphan_lookups(gsub)
