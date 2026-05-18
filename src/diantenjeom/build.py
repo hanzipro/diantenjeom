@@ -46,10 +46,12 @@ from diantenjeom import (
     codepoints,
     dash_center,
     ellipsis_pair,
+    gpos_graft,
     graft,
     pin_locale,
     rotate_quotes,
     vert_nudge,
+    vert_subst,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -115,6 +117,24 @@ class Variant:
     # VORG) from the named source. Centered grafts 、，。 from TC to
     # get the centred form.
     grafts: tuple[tuple[Path, tuple[int, ...]], ...] = ()
+    # Subset of graft codepoints whose hmtx (advance + LSB) should ALSO
+    # be copied from the donor. Default behaviour preserves the JP base
+    # hmtx — required for Chrome pair-squeeze on punctuation. Override
+    # for codepoints where the donor's horizontal width is integral to
+    # the glyph design (e.g. SC's full-width curly quotes replacing
+    # JP's proportional Latin curly quotes).
+    hmtx_graft_cps: tuple[int, ...] = ()
+    # GSUB SingleSubst lookup wired into vert/vrt2: {src_cp: target_cp}.
+    # Used by SC variant to substitute curly quotes (2018/2019/201C/201D)
+    # to corner-bracket vertical presentation forms (FE41-FE44) under
+    # vertical layout — mirroring Noto SC's default ZHS routing.
+    vert_substitutions: dict[int, int] = field(default_factory=dict)
+    # Codepoints for which to also graft GPOS halt/palt SinglePos entries
+    # from the *first* graft's donor font. Required when the grafted
+    # cmap glyph's CJK-punctuation squeeze data lives in the donor's
+    # GPOS but not the JP base (e.g. SC's full-width curly quotes —
+    # halt/palt entries exist in Noto SC but not Noto JP).
+    gpos_squeeze_cps: tuple[int, ...] = ()
     # CSS-side delegation: emit a second @font-face under the same
     # family name that serves `css_delegate_cps` from a sibling
     # variant's woff2. Used by Centered to keep ．(FF0E) as JP-corner
@@ -124,6 +144,17 @@ class Variant:
     # internally with its own consistent dot group).
     css_delegate_donor_stem: str | None = None
     css_delegate_cps: tuple[int, ...] = ()
+    # Codepoints to pass through `center_punct` (Chrome/Safari ~10 %-em
+    # right-offset compensation on ! : ; ?). SC-style variants graft SC
+    # outlines that are already corner-aligned to the front of the em box,
+    # so the additional -50 shift would over-correct — set to `()` to skip.
+    center_punct_cps: tuple[int, ...] = center_punct.JP
+    # OT LangSys tag whose vert/vrt2 lookup list should drive vertical
+    # substitution across all LangSys. "JAN" (default) gives JP-style
+    # vertical (rotated ：, JP brackets, no FE13-FE16 mapping for !:;?).
+    # "ZHS" gives mainland-style vertical (no ：rotation, FE13-FE16 for
+    # !:;? presentation forms, FE41-FE44 for vertical brackets).
+    pin_to_locale: str = "JAN"
 
     @property
     def stem(self) -> str:
@@ -132,7 +163,14 @@ class Variant:
 
     @property
     def family(self) -> str:
-        suffix = f" {self.punct.title()}" if self.punct else ""
+        # Short locale codes (sc/tc/jp/kr) stay upper-case; longer style
+        # words like "centered" get title-cased.
+        if not self.punct:
+            suffix = ""
+        elif len(self.punct) <= 3:
+            suffix = f" {self.punct.upper()}"
+        else:
+            suffix = f" {self.punct.title()}"
         return f"Diantenjeom {self.style.title()}{suffix}"
 
 
@@ -276,10 +314,18 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # (ZHT/ZHS/KOR/etc.) falls back to JAN-style vert wiring. Without this
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
-    pin_locale.install(font, variant.upright_cps)
+    pin_locale.install(font, variant.upright_cps, variant.pin_to_locale)
     for graft_source, graft_cps in variant.grafts:
         if graft_cps:
-            graft.install(font, graft_source, graft_cps)
+            graft.install(font, graft_source, graft_cps, variant.hmtx_graft_cps)
+    if variant.gpos_squeeze_cps and variant.grafts:
+        # Donor for halt/palt is the same as the first cmap graft's
+        # donor — the assumption that holds for our current variants.
+        gpos_graft.install(font, variant.grafts[0][0], variant.gpos_squeeze_cps)
+    # Install vert substitutions BEFORE rotate_quotes so that
+    # rotate_quotes' "skip codepoints with existing vert sub" check
+    # picks them up and doesn't bake a rotated alternate on top.
+    vert_subst.install(font, variant.vert_substitutions)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
     dash_center.install(font)
@@ -287,7 +333,7 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # Brute-force horizontal shift on ! : ; ? to compensate for the
     # Chrome/Safari ~10% cross-axis right offset on these glyphs (see
     # README TODO / docs/vertical-text.md).
-    center_punct.install(font)
+    center_punct.install(font, variant.center_punct_cps)
 
     # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
     # leaves stale bits behind — bit 31 (General Punctuation, where U+2026
@@ -445,6 +491,69 @@ def main() -> None:
             ),
             css_delegate_donor_stem="diantenjeom-serif",
             css_delegate_cps=(0xFF0E,),
+        ),
+        # SC (mainland GB) — three locale-specific behaviours layered on JP
+        # base:
+        #   1. ！：；？ — graft cmap outlines from Noto SC (SC bakes
+        #      corner-aligned positioning into outline x_min). Pin vert
+        #      to ZHS so JP source's L52 (FF01/FF1A/FF1B/FF1F → FE15-FE13/14/16
+        #      presentation forms, designed upper-right for SC vertical) fires.
+        #   2. ‘’“” — graft cmap outlines AND hmtx from Noto SC (SC uses
+        #      full-width 1000-em curly quotes; JP uses ~0.23-0.37 em
+        #      proportional). Graft FE41-FE44 glyphs, then install an
+        #      explicit vert substitution 2018/2019/201C/201D → FE41-FE44
+        #      so vertical layout renders 「」『』 corner brackets in place
+        #      of curly quotes (Chinese vertical convention; mirrors Noto
+        #      SC's default ZHS lookup chain via cmap→vert).
+        # 、，。．are identical between SC and JP, so they stay JP-sourced.
+        Variant(
+            punct="sc",
+            style="sans",
+            source=args.sources / "NotoSansCJKjp-VF.otf",
+            unicodes=codepoints.SC,
+            # FE15 / FE16 (the vert presentation forms for ！？) sit too tight
+            # to the top in SC vertical layout; nudge down 5 % of em. ：；
+            # (FE13 / FE14) stay at source position.
+            vert_nudges={**vert_nudge.JP, 0xFF01: -50, 0xFF1F: -50},
+            pin_to_locale="ZHS",
+            grafts=(
+                (args.sources / "NotoSansCJKsc-VF.otf",
+                 (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
+                  0x2018, 0x2019, 0x201C, 0x201D,
+                  0xFE41, 0xFE42, 0xFE43, 0xFE44)),
+            ),
+            hmtx_graft_cps=(0x2018, 0x2019, 0x201C, 0x201D),
+            vert_substitutions={
+                0x2018: 0xFE41,
+                0x2019: 0xFE42,
+                0x201C: 0xFE43,
+                0x201D: 0xFE44,
+            },
+            gpos_squeeze_cps=(0x2018, 0x2019, 0x201C, 0x201D),
+            center_punct_cps=(),
+        ),
+        Variant(
+            punct="sc",
+            style="serif",
+            source=args.sources / "NotoSerifCJKjp-VF.otf",
+            unicodes=codepoints.SC,
+            vert_nudges={**vert_nudge.JP_SERIF, 0xFF01: -50, 0xFF1F: -50},
+            pin_to_locale="ZHS",
+            grafts=(
+                (args.sources / "NotoSerifCJKsc-VF.otf",
+                 (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
+                  0x2018, 0x2019, 0x201C, 0x201D,
+                  0xFE41, 0xFE42, 0xFE43, 0xFE44)),
+            ),
+            hmtx_graft_cps=(0x2018, 0x2019, 0x201C, 0x201D),
+            vert_substitutions={
+                0x2018: 0xFE41,
+                0x2019: 0xFE42,
+                0x201C: 0xFE43,
+                0x201D: 0xFE44,
+            },
+            gpos_squeeze_cps=(0x2018, 0x2019, 0x201C, 0x201D),
+            center_punct_cps=(),
         ),
     ]
 

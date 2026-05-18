@@ -43,3 +43,13 @@ JP: list[int] = [
     0xFF0D,                  # 連接號 －
     0xFF0F, 0xFF3C,          # 斜線 ／＼
 ]
+
+# SC — JP set plus the four corner-bracket vertical presentation forms.
+# Required because the SC variant installs a vert/vrt2 substitution that
+# maps ‘’“” (U+2018/2019/201C/201D) to U+FE41/FE42/FE43/FE44 (per Noto SC's
+# default ZHS convention — Chinese vertical typesetting renders curly quotes
+# as 「」『』 corner brackets). The FE41-FE44 glyphs must be present in the
+# subset so the substitution targets resolve at render time.
+SC: list[int] = JP + [
+    0xFE41, 0xFE42, 0xFE43, 0xFE44,  # 直角引號直排 presentation forms
+]
