@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Noto Sans/Serif CJK SC — curly-quote pair compression test</title>
+
+  <style>
+    /* Direct from /sources/ — no diantenjeom pipeline.
+       Big download (~30/53 MB) but localhost ⇒ fine for a one-off test. */
+    @font-face {
+      font-family: 'NotoSansSC-raw';
+      src: url('./sources/NotoSansCJKsc-VF.otf') format('opentype-variations'),
+           url('./sources/NotoSansCJKsc-VF.otf') format('opentype');
+      font-weight: 100 900;
+    }
+    @font-face {
+      font-family: 'NotoSerifSC-raw';
+      src: url('./sources/NotoSerifCJKsc-VF.otf') format('opentype-variations'),
+           url('./sources/NotoSerifCJKsc-VF.otf') format('opentype');
+      font-weight: 200 900;
+    }
+
+    :root {
+      font-family: ui-sans-serif, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    body { margin: 0; padding: 1rem; }
+
+    header {
+      position: sticky; top: 0;
+      background: #f3f3f3;
+      border-bottom: 1px solid #ccc;
+      padding: .75rem 1rem;
+      display: flex; flex-wrap: wrap; gap: 1.5rem;
+      z-index: 10;
+    }
+    label { display: flex; align-items: center; gap: .35em; font-size: .85em; }
+
+    main { padding: 1rem; max-width: 60em; margin: 0 auto; }
+
+    h2 { font-size: 1em; margin: 2em 0 .5em; color: #555; font-weight: 600; }
+    h2:first-of-type { margin-top: 0; }
+
+    .specimen {
+      font-family: var(--family);
+      font-size: 2rem;
+      line-height: 1.6;
+      letter-spacing: 0;
+      padding: .5em .75em;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-block: .35em;
+      text-spacing-trim: var(--tst);
+      font-feature-settings: var(--ffs);
+    }
+
+    .specimen .vertical {
+      writing-mode: vertical-rl;
+      block-size: 14em;
+      display: inline-block;
+      padding-inline: .5em;
+      border-inline: 1px dashed #ccc;
+      margin-inline-end: 1em;
+    }
+
+    .label {
+      font-family: ui-monospace, monospace;
+      font-size: .7em;
+      color: #888;
+      display: block;
+      margin-block-end: .15em;
+    }
+
+    /* Defaults — controls override via JS */
+    :root {
+      --family: 'NotoSansSC-raw', sans-serif;
+      --tst: normal;
+      --ffs: normal;
+    }
+  </style>
+
+  <script type="module">
+    const setVar = (name, val) => document.documentElement.style.setProperty(name, val);
+
+    document.querySelectorAll('input[name="family"]').forEach($i => {
+      $i.addEventListener('change', () => setVar('--family', $i.value));
+    });
+    document.querySelectorAll('input[name="tst"]').forEach($i => {
+      $i.addEventListener('change', () => setVar('--tst', $i.value));
+    });
+    document.querySelectorAll('input[name="halt"]').forEach($i => {
+      $i.addEventListener('change', () => {
+        const halt = document.querySelector('input[name="halt"]:checked').value === 'on';
+        const palt = document.querySelector('input[name="palt"]:checked').value === 'on';
+        const parts = [];
+        if (halt) parts.push("'halt' 1");
+        if (palt) parts.push("'palt' 1");
+        setVar('--ffs', parts.length ? parts.join(', ') : 'normal');
+      });
+    });
+    document.querySelectorAll('input[name="palt"]').forEach($i => {
+      $i.addEventListener('change', () => {
+        const halt = document.querySelector('input[name="halt"]:checked').value === 'on';
+        const palt = document.querySelector('input[name="palt"]:checked').value === 'on';
+        const parts = [];
+        if (halt) parts.push("'halt' 1");
+        if (palt) parts.push("'palt' 1");
+        setVar('--ffs', parts.length ? parts.join(', ') : 'normal');
+      });
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <fieldset style="display:flex;gap:.5rem;border:none;padding:0;margin:0">
+      <strong style="font-size:.85em">family</strong>
+      <label><input type="radio" name="family" value="'NotoSansSC-raw', sans-serif" checked> Sans</label>
+      <label><input type="radio" name="family" value="'NotoSerifSC-raw', serif"> Serif</label>
+    </fieldset>
+    <fieldset style="display:flex;gap:.5rem;border:none;padding:0;margin:0">
+      <strong style="font-size:.85em">text-spacing-trim</strong>
+      <label><input type="radio" name="tst" value="normal" checked> normal</label>
+      <label><input type="radio" name="tst" value="trim-start"> trim-start</label>
+      <label><input type="radio" name="tst" value="space-all"> space-all</label>
+    </fieldset>
+    <fieldset style="display:flex;gap:.5rem;border:none;padding:0;margin:0">
+      <strong style="font-size:.85em">explicit features</strong>
+      <label><input type="radio" name="halt" value="off" checked> halt off</label>
+      <label><input type="radio" name="halt" value="on"> halt on</label>
+      <label><input type="radio" name="palt" value="off" checked> palt off</label>
+      <label><input type="radio" name="palt" value="on"> palt on</label>
+    </fieldset>
+  </header>
+
+  <main>
+    <p style="font-size:.85em;color:#666">
+      直接讀 <code>sources/NotoSans/SerifCJKsc-VF.otf</code> 整個 OTF，沒過 diantenjeom subset 管道。
+      測 Chrome 對連續全形彎引號是否套用 <code>halt</code> 擠壓（Noto SC source 本身有完整 halt/palt + ZHS locl + 所有 LangSys）。
+      下方對照組 <code>「」『』</code> 已知會擠壓 — 觀察彎引號是否一致。
+    </p>
+
+    <h2>連續開引號（kOpen + kOpen）</h2>
+    <div class="specimen"><span class="label">“‘中’”</span>“‘中’”</div>
+    <div class="specimen"><span class="label">「『中』」</span>「『中』」</div>
+
+    <h2>連續收引號（kClose + kClose）</h2>
+    <div class="specimen"><span class="label">中’”、後</span>中’”、後</div>
+    <div class="specimen"><span class="label">中』」、後</span>中』」、後</div>
+
+    <h2>收+開（kClose + kOpen）— 經典擠壓場景</h2>
+    <div class="specimen"><span class="label">話”“接</span>話”“接</div>
+    <div class="specimen"><span class="label">話」「接</span>話」「接</div>
+    <div class="specimen"><span class="label">話”「接（quote 收 + 括 開）</span>話”「接</div>
+    <div class="specimen"><span class="label">話」“接（括 收 + quote 開）</span>話」“接</div>
+
+    <h2>夾雜 Han</h2>
+    <div class="specimen"><span class="label">中“引”文「括」中</span>中“引”文「括」中</div>
+
+    <h2>長句</h2>
+    <div class="specimen"><span class="label">SC 段落示例</span>
+      他說：“這個‘點’的政治⸺一場永無止境的美學辯論”——‘This dot is mine,’ he said, “not…yours.”</div>
+
+    <h2>直排</h2>
+    <div class="specimen">
+      <span class="label">vertical: “‘中’” vs 「『中』」</span>
+      <div class="vertical">“‘中文段落’”</div>
+      <div class="vertical">「『中文段落』」</div>
+    </div>
+  </main>
+</body>
+</html>

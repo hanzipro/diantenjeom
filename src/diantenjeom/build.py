@@ -516,6 +516,12 @@ def main() -> None:
             # (FE13 / FE14) stay at source position.
             vert_nudges={**vert_nudge.JP, 0xFF01: -50, 0xFF1F: -50},
             pin_to_locale="ZHS",
+            # Retain every source feature (incl. locl). Required for Chrome's
+            # text-spacing-trim gate — `locl` absent => trim disabled font-wide
+            # (see docs/chrome-pair-squeeze.md). Side effect: under lang="ja"
+            # JAN locl substitutes our grafted SC glyphs to JP forms; benign
+            # given SC font under ja is unusual usage.
+            layout_features=("*",),
             grafts=(
                 (args.sources / "NotoSansCJKsc-VF.otf",
                  (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
@@ -539,6 +545,7 @@ def main() -> None:
             unicodes=codepoints.SC,
             vert_nudges={**vert_nudge.JP_SERIF, 0xFF01: -50, 0xFF1F: -50},
             pin_to_locale="ZHS",
+            layout_features=("*",),
             grafts=(
                 (args.sources / "NotoSerifCJKsc-VF.otf",
                  (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
