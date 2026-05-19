@@ -9,7 +9,7 @@
 
     font-size: 16px;
     font-family: var(--sans);
-    text-spacing-trim: normal;
+    text-spacing-trim: trim-start;
   }
   *, *::before, &::after {
     box-sizing: inherit;

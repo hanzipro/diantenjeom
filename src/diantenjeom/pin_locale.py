@@ -32,12 +32,15 @@ from fontTools.ttLib import TTFont
 _LOCALE_VARIANT_TAGS = ("vert", "vrt2")
 
 
-def _locale_vert_lookups(table, locale: str) -> list[int] | None:
-    """Return the lookup list that `locale`'s `vert` feature uses.
+def _locale_feature_lookups(
+    table, locale: str, feature_tag: str
+) -> list[int] | None:
+    """Return the lookup list that `locale`'s `feature_tag` feature
+    uses.
 
     `locale="JAN"` resolves to DefaultLangSys (Noto CJK Source Han uses
-    JAN as the script default). Anything else walks LangSysRecord for a
-    matching `LangSysTag`. Returns `None` if no match.
+    JAN as the script default). Anything else walks LangSysRecord for
+    a matching `LangSysTag`. Returns `None` if no match.
     """
     feature_list = table.FeatureList.FeatureRecord
     for sr in table.ScriptList.ScriptRecord:
@@ -53,9 +56,52 @@ def _locale_vert_lookups(table, locale: str) -> list[int] | None:
         if target_langsys is None:
             continue
         for fi in target_langsys.FeatureIndex:
-            if feature_list[fi].FeatureTag == "vert":
+            if feature_list[fi].FeatureTag == feature_tag:
                 return list(feature_list[fi].Feature.LookupListIndex)
     return None
+
+
+def _locale_vert_lookups(table, locale: str) -> list[int] | None:
+    return _locale_feature_lookups(table, locale, "vert")
+
+
+def _alias_locl_to_locale(table, locale: str) -> None:
+    """Rewrite every `locl` FeatureRecord to reference `locale`'s locl
+    lookup list. Used to make the *visual rendering* of the face's
+    cmap codepoints invariant across document `lang`: whatever lang
+    the page sets, the same locl lookup list fires (and thus the same
+    glyph substitutions), so face design is preserved.
+
+    Trade-off: pinning to a langsys whose locl doesn't substitute this
+    face's cmap codepoints means locl effectively no-ops on this face,
+    which CAN break Chrome's text-spacing-trim gate (the gate seems
+    sensitive to whether locl actually fires substitutions on the
+    10-kChar test set — see docs/chrome-pair-squeeze.md). Pin to a
+    locale whose locl IS expected to affect the face's codepoints to
+    keep the gate happy.
+
+    Pinning matrix used by the split family (heuristic, may need
+    revisiting if gate behaviour changes):
+
+      Dot variants → "JAN"   (JAN locl doesn't substitute 、 。 ， ．,
+                              keeping the chosen Anchored / Centered
+                              design stable across all lang values)
+      Mark Centered → "JAN"  (JAN locl doesn't substitute ：；！？,
+                              keeping the centred design stable)
+      Mark Anchored → "ZHS"  (ZHS locl substitutes ：；！？ to SC
+                              corner-aligned alternates — exactly what
+                              the Anchored variant wants visually)
+      Curly / Bracket / Joiner → None  (locl unpinned: Curly relies on
+                              lang-switching for width, Bracket / Joiner
+                              don't have codepoints locl substitutes)
+    """
+    lookups = _locale_feature_lookups(table, locale, "locl")
+    if lookups is None:
+        return
+    for fr in table.FeatureList.FeatureRecord:
+        if fr.FeatureTag == "locl":
+            fr.Feature.LookupListIndex = list(lookups)
+            fr.Feature.LookupCount = len(lookups)
 
 
 def _alias_vert_to_locale(table, locale: str) -> None:
@@ -172,6 +218,7 @@ def install(
     font: TTFont,
     extra_upright: tuple[int, ...] = (),
     pin_to_locale: str = "JAN",
+    pin_locl_to: str | None = None,
 ) -> None:
     """Pin vert/vrt2 behaviour to `pin_to_locale` regardless of the
     document's OT language tag, plus add identity self-subst for upright
@@ -193,6 +240,8 @@ def install(
     if "GSUB" in font:
         gsub = font["GSUB"].table
         _alias_vert_to_locale(gsub, pin_to_locale)
+        if pin_locl_to is not None:
+            _alias_locl_to_locale(gsub, pin_locl_to)
         _force_upright(font, gsub, extra_upright)
         _add_upright_self_substs(font, gsub, pin_to_locale, extra_upright)
         _empty_orphan_lookups(gsub)

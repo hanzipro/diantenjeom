@@ -1,20 +1,32 @@
-"""Extract CJK punctuation glyphs from Noto Sans/Serif CJK.
+"""Shared pipeline library — `Variant` dataclass + `subset_one` +
+`write_css` + `run_build`.
 
-Pipeline:
+This module is a library; `main()` lives in two scripts:
+    scripts/build_locale.py  → Locale family (JP/Centered/SC × Sans/Serif)
+    scripts/build_segment.py → Segment family (per-group Sans/Serif faces)
+
+Both scripts import `Variant` (or subclass), populate a list of variants,
+and call `run_build(variants, output_css_path)`.
+
+Pipeline per variant:
     1. Load a source Noto CJK variable font.
-    2. Subset to the per-locale punctuation codepoint set (see `codepoints.py`).
-    3. Keep GSUB/GPOS layout features so vertical typesetting (`vert`, `vrt2`)
-       and CSS punctuation-squeezing (`palt`, `vpal`, `halt`, `vhal`) survive.
-    4. Rewrite the name table so the OTF doesn't shadow installed Noto CJK.
-    5. Emit OTF (desktop: InDesign, apps) and WOFF2 (web) to dist/.
-    6. Generate a sample @font-face CSS.
+    2. Subset to the per-variant codepoint set (`codepoints.py`).
+    3. Keep GSUB/GPOS layout features so vertical typesetting (`vert`,
+       `vrt2`) and punctuation squeezing (`palt`, `vpal`, `halt`,
+       `vhal`) survive.
+    4. Apply per-variant adjustments via the helper modules
+       (`pin_locale`, `graft`, `gpos_graft`, `vert_subst`, `vert_nudge`,
+       `dash_center`, `ellipsis_pair`, `center_punct`, `circle`,
+       `rotate_quotes`, and — segment-only — `align_locl`).
+    5. Rewrite name records so the OTF doesn't shadow installed Noto CJK.
+    6. Emit OTF + WOFF2 to dist/.
 
-Current scope: Noto Sans JP only. Other locales/styles wired up later.
+The CSS bundle is written separately per script (each gets its own
+output_css_path).
 """
 
 from __future__ import annotations
 
-import argparse
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,7 +54,10 @@ CANONICAL_INSTANCES: list[tuple[int, str]] = [
 INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
 
 from diantenjeom import (
+    _outline,
+    align_locl,
     center_punct,
+    circle,
     codepoints,
     dash_center,
     ellipsis_pair,
@@ -155,6 +170,15 @@ class Variant:
     # "ZHS" gives mainland-style vertical (no ：rotation, FE13-FE16 for
     # !:;? presentation forms, FE41-FE44 for vertical brackets).
     pin_to_locale: str = "JAN"
+    # If set, alias every `locl` FeatureRecord's LookupListIndex to
+    # this langsys's locl lookup list, making locl behaviour invariant
+    # across the document's `lang`. Used by:
+    #   - Locale SC (pin to ZHS) — keeps SC's grafted cmap design from
+    #     being overwritten by ZHT/ZHH/etc. locl under non-zh-Hans
+    #     document lang.
+    #   - Segment Mark Anchored (pin to ZHS) — same rationale.
+    # See `pin_locale._alias_locl_to_locale` docstring.
+    pin_locl_to: str | None = None
 
     @property
     def stem(self) -> str:
@@ -163,14 +187,15 @@ class Variant:
 
     @property
     def family(self) -> str:
-        # Short locale codes (sc/tc/jp/kr) stay upper-case; longer style
-        # words like "centered" get title-cased.
+        # Locale codes (sc/tc/jp/kr) stay upper-case; hyphenated punct
+        # values ("dot-anchored", "mark-centered") split into space-
+        # separated title-cased words; everything else title-cases.
         if not self.punct:
             suffix = ""
-        elif len(self.punct) <= 3:
+        elif self.punct in {"sc", "tc", "jp", "kr"}:
             suffix = f" {self.punct.upper()}"
         else:
-            suffix = f" {self.punct.title()}"
+            suffix = " " + " ".join(w.title() for w in self.punct.split("-"))
         return f"Diantenjeom {self.style.title()}{suffix}"
 
 
@@ -314,7 +339,12 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # (ZHT/ZHS/KOR/etc.) falls back to JAN-style vert wiring. Without this
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
-    pin_locale.install(font, variant.upright_cps, variant.pin_to_locale)
+    pin_locale.install(
+        font,
+        variant.upright_cps,
+        variant.pin_to_locale,
+        variant.pin_locl_to,
+    )
     for graft_source, graft_cps in variant.grafts:
         if graft_cps:
             graft.install(font, graft_source, graft_cps, variant.hmtx_graft_cps)
@@ -334,6 +364,38 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # Chrome/Safari ~10% cross-axis right offset on these glyphs (see
     # README TODO / docs/vertical-text.md).
     center_punct.install(font, variant.center_punct_cps)
+
+    # Hand-drawn U+25CF for CSS `text-emphasis: circle`. No-op when the
+    # variant's codepoint set doesn't include U+25CF (the source font's
+    # cmap doesn't have it either after subset; circle.install guards
+    # on "already in cmap" so the second call is harmless).
+    if 0x25CF in variant.unicodes:
+        circle.install(font)
+
+    # Overwrite locl target glyphs to match cmap sources, so locl-fired
+    # substitutions render visually identical to the cmap design.
+    # Used by Segment variants (e.g. Dot / Mark) which subclass Variant
+    # and add an `align_locl_cps` attribute. Locale variants don't
+    # subclass and have no such attribute — `getattr` returns the empty
+    # tuple and the call no-ops.
+    # Per-codepoint cmap-glyph outline translation. Run BEFORE
+    # align_locl so the shifted outline propagates into locl targets.
+    # (Segment-only field; Locale variants don't subclass.)
+    outline_shifts = getattr(variant, "outline_shifts", {})
+    if outline_shifts:
+        cmap = font.getBestCmap()
+        for cp, (dx, dy) in outline_shifts.items():
+            glyph = cmap.get(cp)
+            if glyph is not None:
+                _outline.shift_in_place(font, glyph, dx, dy)
+                # Update hmtx lsb so glyph metadata matches new outline.
+                if glyph in font["hmtx"].metrics:
+                    adv, lsb = font["hmtx"].metrics[glyph]
+                    font["hmtx"].metrics[glyph] = (adv, lsb + dx)
+
+    align_cps = getattr(variant, "align_locl_cps", ())
+    if align_cps:
+        align_locl.install(font, align_cps)
 
     # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
     # leaves stale bits behind — bit 31 (General Punctuation, where U+2026
@@ -392,8 +454,14 @@ def _face_block(family: str, stem: str, wmin: int, wmax: int, unicodes: list[int
     )
 
 
-def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
+def write_css(
+    entries: list[tuple[Variant, tuple[int, int]]],
+    output_path: Path,
+) -> Path:
+    """Emit all `entries`' @font-face blocks (incl. css_delegate side-
+    faces) to `output_path` as a single CSS file. Returns the path."""
     weight_by_stem = {v.stem: wr for v, wr in entries}
+
     blocks: list[str] = []
     for v, (wmin, wmax) in entries:
         # Main face — exclude any codepoints delegated to a sibling
@@ -417,153 +485,19 @@ def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
                     list(v.css_delegate_cps),
                 )
             )
-    out = DIST / "diantenjeom.css"
-    out.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
-    return out
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
+    return output_path
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Build diantenjeom punctuation fonts.")
-    parser.add_argument(
-        "--sources",
-        type=Path,
-        default=ROOT / "sources",
-        help="Directory containing Noto CJK source fonts.",
-    )
-    args = parser.parse_args()
-
-    # Scope: JP-style sans + serif (the recommended default; no suffix in
-    # the family name). Add `punct="centered"` / `punct="gb"` variants
-    # here as those positioning styles come online.
-    variants: list[Variant] = [
-        Variant(
-            punct="",
-            style="sans",
-            source=args.sources / "NotoSansCJKjp-VF.otf",
-            unicodes=codepoints.JP,
-            vert_nudges=vert_nudge.JP,
-        ),
-        Variant(
-            punct="",
-            style="serif",
-            source=args.sources / "NotoSerifCJKjp-VF.otf",
-            unicodes=codepoints.JP,
-            vert_nudges=vert_nudge.JP_SERIF,
-        ),
-        # Centered: TW MOE-style punctuation positioning. For now the only
-        # divergence from JP is ：(U+FF1A) staying upright in vertical mode
-        # (Chinese convention) instead of rotating 90° (JP convention).
-        # 、，。centring and other Centered-specific adjustments to follow.
-        # Centered: TC-style centred 、，。 (grafted from Noto TC source),
-        # ：upright in vertical. Keep ALL layout features — Chrome's
-        # text-spacing-trim requires the source's `locl` feature to be
-        # present AND its mappings + target glyph outlines untouched, or
-        # pair-squeeze disables across the whole font. The side effect
-        # is ZHT locl swaps under lang="zh-Hant" (．/！/？/：/；/etc.).
-        # See docs/chrome-pair-squeeze.md.
-        Variant(
-            punct="centered",
-            style="sans",
-            source=args.sources / "NotoSansCJKjp-VF.otf",
-            unicodes=codepoints.JP,
-            vert_nudges={},
-            upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
-            layout_features=("*",),
-            grafts=(
-                (args.sources / "NotoSansCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
-            ),
-            # ．(FF0E) delegated to the JP-default sans woff2 via the
-            # @font-face unicode-range split — keeps ．JP-corner without
-            # tripping Chrome's han_kerning four-dot consistency gate.
-            css_delegate_donor_stem="diantenjeom-sans",
-            css_delegate_cps=(0xFF0E,),
-        ),
-        Variant(
-            punct="centered",
-            style="serif",
-            source=args.sources / "NotoSerifCJKjp-VF.otf",
-            unicodes=codepoints.JP,
-            vert_nudges={},
-            upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
-            layout_features=("*",),
-            grafts=(
-                (args.sources / "NotoSerifCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
-            ),
-            css_delegate_donor_stem="diantenjeom-serif",
-            css_delegate_cps=(0xFF0E,),
-        ),
-        # SC (mainland GB) — three locale-specific behaviours layered on JP
-        # base:
-        #   1. ！：；？ — graft cmap outlines from Noto SC (SC bakes
-        #      corner-aligned positioning into outline x_min). Pin vert
-        #      to ZHS so JP source's L52 (FF01/FF1A/FF1B/FF1F → FE15-FE13/14/16
-        #      presentation forms, designed upper-right for SC vertical) fires.
-        #   2. ‘’“” — graft cmap outlines AND hmtx from Noto SC (SC uses
-        #      full-width 1000-em curly quotes; JP uses ~0.23-0.37 em
-        #      proportional). Graft FE41-FE44 glyphs, then install an
-        #      explicit vert substitution 2018/2019/201C/201D → FE41-FE44
-        #      so vertical layout renders 「」『』 corner brackets in place
-        #      of curly quotes (Chinese vertical convention; mirrors Noto
-        #      SC's default ZHS lookup chain via cmap→vert).
-        # 、，。．are identical between SC and JP, so they stay JP-sourced.
-        Variant(
-            punct="sc",
-            style="sans",
-            source=args.sources / "NotoSansCJKjp-VF.otf",
-            unicodes=codepoints.SC,
-            # FE15 / FE16 (the vert presentation forms for ！？) sit too tight
-            # to the top in SC vertical layout; nudge down 5 % of em. ：；
-            # (FE13 / FE14) stay at source position.
-            vert_nudges={**vert_nudge.JP, 0xFF01: -50, 0xFF1F: -50},
-            pin_to_locale="ZHS",
-            # Retain every source feature (incl. locl). Required for Chrome's
-            # text-spacing-trim gate — `locl` absent => trim disabled font-wide
-            # (see docs/chrome-pair-squeeze.md). Side effect: under lang="ja"
-            # JAN locl substitutes our grafted SC glyphs to JP forms; benign
-            # given SC font under ja is unusual usage.
-            layout_features=("*",),
-            grafts=(
-                (args.sources / "NotoSansCJKsc-VF.otf",
-                 (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
-                  0x2018, 0x2019, 0x201C, 0x201D,
-                  0xFE41, 0xFE42, 0xFE43, 0xFE44)),
-            ),
-            hmtx_graft_cps=(0x2018, 0x2019, 0x201C, 0x201D),
-            vert_substitutions={
-                0x2018: 0xFE41,
-                0x2019: 0xFE42,
-                0x201C: 0xFE43,
-                0x201D: 0xFE44,
-            },
-            gpos_squeeze_cps=(0x2018, 0x2019, 0x201C, 0x201D),
-            center_punct_cps=(),
-        ),
-        Variant(
-            punct="sc",
-            style="serif",
-            source=args.sources / "NotoSerifCJKjp-VF.otf",
-            unicodes=codepoints.SC,
-            vert_nudges={**vert_nudge.JP_SERIF, 0xFF01: -50, 0xFF1F: -50},
-            pin_to_locale="ZHS",
-            layout_features=("*",),
-            grafts=(
-                (args.sources / "NotoSerifCJKsc-VF.otf",
-                 (0xFF01, 0xFF1A, 0xFF1B, 0xFF1F,
-                  0x2018, 0x2019, 0x201C, 0x201D,
-                  0xFE41, 0xFE42, 0xFE43, 0xFE44)),
-            ),
-            hmtx_graft_cps=(0x2018, 0x2019, 0x201C, 0x201D),
-            vert_substitutions={
-                0x2018: 0xFE41,
-                0x2019: 0xFE42,
-                0x201C: 0xFE43,
-                0x201D: 0xFE44,
-            },
-            gpos_squeeze_cps=(0x2018, 0x2019, 0x201C, 0x201D),
-            center_punct_cps=(),
-        ),
-    ]
-
+def run_build(
+    variants: list[Variant],
+    output_css_path: Path,
+) -> None:
+    """Orchestrate: subset each variant, then write a single CSS bundle.
+    Both `scripts/build_locale.py` and `scripts/build_segment.py` call
+    this with their own variant list + css output path."""
     entries: list[tuple[Variant, tuple[int, int]]] = []
     for v in variants:
         if not v.source.exists():
@@ -573,9 +507,7 @@ def main() -> None:
             print(f"built {path.relative_to(ROOT)}")
         entries.append((v, weight_range))
 
-    css = write_css(entries)
+    css = write_css(entries, output_css_path)
     print(f"wrote {css.relative_to(ROOT)}")
 
 
-if __name__ == "__main__":
-    main()

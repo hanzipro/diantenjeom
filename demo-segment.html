@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diantenjeom Split — per-group pair compression harness</title>
+  <link rel="stylesheet" href="dist/diantenjeom-segment.css">
+
+  <style>
+    :root {
+      font-family: ui-sans-serif, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      --style-prefix: 'Diantenjeom Sans';
+      --dot-variant: 'Dot Anchored';
+      --mark-variant: 'Mark Centered';
+      --han: 'Hiragino Sans', 'Yu Gothic', 'PingFang TC', 'PingFang SC', system-ui;
+      /* fallback chain rebuilt by JS */
+      --stack: var(--han), sans-serif;
+      --tst: trim-start;
+      --ffs: normal;
+    }
+    body { margin: 0; padding: 0 1rem 4rem; }
+
+    header {
+      position: sticky; top: 0;
+      background: #f3f3f3;
+      border-bottom: 1px solid #ccc;
+      padding: .75rem 1rem;
+      margin-inline: -1rem;
+      display: flex; flex-wrap: wrap; gap: 1.25rem;
+      z-index: 10;
+      font-size: .85em;
+    }
+    fieldset {
+      border: none; padding: 0; margin: 0;
+      display: flex; gap: .35rem; align-items: center;
+    }
+    label { display: flex; align-items: center; gap: .25em; }
+    strong { font-weight: 600; color: #444; }
+
+    main { max-width: 60em; margin-inline: auto; }
+    h2 { font-size: .8em; margin: 1.6em 0 .35em; color: #888; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 14em 1fr;
+      gap: .5rem 1rem;
+      align-items: baseline;
+      padding-block: .15em;
+      border-bottom: 1px dotted #eee;
+    }
+    .label { font-family: ui-monospace, monospace; font-size: .75em; color: #888; }
+    .specimen {
+      font-family: var(--stack);
+      font-size: 2rem;
+      letter-spacing: 0;
+      text-spacing-trim: var(--tst);
+      font-feature-settings: var(--ffs);
+    }
+    .specimen.vertical {
+      writing-mode: vertical-rl;
+      block-size: 10em;
+      display: inline-block;
+      padding-inline: .35em;
+      vertical-align: top;
+    }
+
+    p.note {
+      font-size: .85em; color: #555; max-width: 50em;
+      margin-block: 1em;
+    }
+    p.note code { background: #f0f0f0; padding: .1em .35em; border-radius: 3px; font-size: .9em; }
+
+    .emphasis {
+      text-emphasis: filled circle;
+      text-emphasis-position: over right;
+      -webkit-text-emphasis: filled circle;
+      -webkit-text-emphasis-position: over right;
+      padding-block-start: 1.2em;
+    }
+    .emphasis.system {
+      font-family: var(--han), sans-serif;  /* skip Diantenjeom */
+    }
+    .emphasis.vertical {
+      writing-mode: vertical-rl;
+      text-emphasis-position: over right;
+      block-size: 10em;
+      padding-inline: .8em;
+    }
+  </style>
+
+  <script type="module">
+    const root = document.documentElement;
+    const setVar = (n, v) => root.style.setProperty(n, v);
+
+    // ---- text-spacing-trim radios
+    for (const $i of document.querySelectorAll('input[name="tst"]')) {
+      $i.addEventListener('change', () => setVar('--tst', $i.value));
+    }
+
+    // ---- explicit feature toggles (halt / palt)
+    for (const $i of document.querySelectorAll('input[name="ffs"]')) {
+      $i.addEventListener('change', updateFFS);
+    }
+    function updateFFS() {
+      const parts = [...document.querySelectorAll('input[name="ffs"]:checked')]
+        .map($i => `'${$i.value}' 1`);
+      setVar('--ffs', parts.length ? parts.join(', ') : 'normal');
+    }
+
+    // ---- lang attribute
+    for (const $i of document.querySelectorAll('input[name="lang"]')) {
+      $i.addEventListener('change', () => document.documentElement.lang = $i.value);
+    }
+
+    // ---- style (Sans / Serif)
+    for (const $i of document.querySelectorAll('input[name="style"]')) {
+      $i.addEventListener('change', () => {
+        setVar('--style-prefix', `'Diantenjeom ${$i.value}'`);
+        rebuildStack();
+      });
+    }
+
+    // ---- Dot / Mark variant select
+    for (const $i of document.querySelectorAll('input[name="dotvar"]')) {
+      $i.addEventListener('change', () => {
+        setVar('--dot-variant', $i.value);
+        rebuildStack();
+      });
+    }
+    for (const $i of document.querySelectorAll('input[name="markvar"]')) {
+      $i.addEventListener('change', () => {
+        setVar('--mark-variant', $i.value);
+        rebuildStack();
+      });
+    }
+
+    // ---- per-face on/off (rebuild --stack)
+    for (const $i of document.querySelectorAll('input[name="face"]')) {
+      $i.addEventListener('change', rebuildStack);
+    }
+
+    function rebuildStack() {
+      const style = document.querySelector('input[name="style"]:checked').value;
+      const dotVar = document.querySelector('input[name="dotvar"]:checked').value;
+      const markVar = document.querySelector('input[name="markvar"]:checked').value;
+      const on = (n) => document.querySelector(`input[name="face"][value="${n}"]`).checked;
+      const fam = (suffix) => `'Diantenjeom ${style} ${suffix}'`;
+      const parts = [];
+      if (on('joiner'))  parts.push(fam('Joiner'));
+      if (on('curly'))   parts.push(fam('Curly'));
+      if (on('dot'))     parts.push(fam(dotVar));
+      if (on('bracket')) parts.push(fam('Bracket'));
+      if (on('mark'))    parts.push(fam(markVar));
+      parts.push('var(--han)', 'sans-serif');
+      setVar('--stack', parts.join(', '));
+    }
+
+    rebuildStack();
+  </script>
+</head>
+<body>
+  <header>
+    <fieldset>
+      <strong>style</strong>
+      <label><input type="radio" name="style" value="Sans" checked>Sans</label>
+      <label><input type="radio" name="style" value="Serif">Serif</label>
+    </fieldset>
+    <fieldset>
+      <strong>face</strong>
+      <label><input type="checkbox" name="face" value="joiner" checked>Joiner</label>
+      <label><input type="checkbox" name="face" value="curly" checked>Curly</label>
+      <label><input type="checkbox" name="face" value="dot" checked>Dot</label>
+      <label><input type="checkbox" name="face" value="bracket" checked>Bracket</label>
+      <label><input type="checkbox" name="face" value="mark" checked>Mark</label>
+    </fieldset>
+    <fieldset>
+      <strong>Dot</strong>
+      <label><input type="radio" name="dotvar" value="Dot Anchored" checked>Anchored</label>
+      <label><input type="radio" name="dotvar" value="Dot Centered">Centered</label>
+    </fieldset>
+    <fieldset>
+      <strong>Mark</strong>
+      <label><input type="radio" name="markvar" value="Mark Centered" checked>Centered</label>
+      <label><input type="radio" name="markvar" value="Mark Centered Rotated">Centered Rotated</label>
+      <label><input type="radio" name="markvar" value="Mark Anchored">Anchored</label>
+    </fieldset>
+    <fieldset>
+      <strong>text-spacing-trim</strong>
+      <label><input type="radio" name="tst" value="trim-start" checked>trim-start</label>
+      <label><input type="radio" name="tst" value="normal">normal</label>
+      <label><input type="radio" name="tst" value="space-all">space-all</label>
+    </fieldset>
+    <fieldset>
+      <strong>feature</strong>
+      <label><input type="checkbox" name="ffs" value="halt">halt</label>
+      <label><input type="checkbox" name="ffs" value="palt">palt</label>
+    </fieldset>
+    <fieldset>
+      <strong>lang</strong>
+      <label><input type="radio" name="lang" value="ja" checked>ja</label>
+      <label><input type="radio" name="lang" value="zh-Hant">zh-Hant</label>
+      <label><input type="radio" name="lang" value="zh-Hans">zh-Hans</label>
+    </fieldset>
+  </header>
+
+  <main>
+    <p class="note">
+      14 個 face 拆 Joiner / Curly / Dot {Anchored, Centered} / Bracket / Mark {Centered, Anchored}，
+      Sans + Serif 對等。Page font-family 是動態 fallback chain：可逐 face 開關、Dot / Mark 變體切換、Sans / Serif 切換。
+      <code>Joiner</code>（中點 / 破折號 / 刪節號）與 <code>Curly</code>（彎引號）是 must-have，其他可選。
+    </p>
+
+    <h2>text-emphasis: circle（U+25CF 取自 Joiner）</h2>
+    <p class="note">
+      CSS <code>text-emphasis: filled circle</code> 用 U+25CF 在每個字上方畫圓。
+      系統字體的 U+25CF 通常 &gt;50 % em（太大太醜），Joiner 把它換成 0.30 em 小圓。
+      下方兩段都套同一條 CSS，差別只在第二段把 Diantenjeom 從 fallback 移除，看系統字體版本。
+    </p>
+    <div class="row"><span class="label">DTJ Joiner ●</span>
+      <span class="specimen emphasis">他終於說出來：這個點，到底用哪個字元才算對？</span></div>
+    <div class="row"><span class="label">系統字體 ●（對照）</span>
+      <span class="specimen emphasis system">他終於說出來：這個點，到底用哪個字元才算對？</span></div>
+    <div class="row"><span class="label">直排 DTJ Joiner</span>
+      <span class="specimen emphasis vertical">這個點才是重點，其他都是干擾。</span>
+      <span class="specimen emphasis vertical system">這個點才是重點，其他都是干擾。</span>
+    </div>
+
+    <h2>Joiner clobber 對比 — 關掉 Joiner，看西文字體蓋掉</h2>
+    <p class="note">把上面 Joiner 開關關掉，比較 <code>· — …</code> 的視覺差別（半形 / 沉底 / 寬度）。</p>
+    <div class="row"><span class="label">middle dot</span>
+      <span class="specimen">武那·禮告<br>莫那·魯道<br>9·11 事件</span></div>
+    <div class="row"><span class="label">katakana midpoint</span>
+      <span class="specimen">漢那・伍茂<br>莫那・魯道<br>コーヒー・ブレイク</span></div>
+    <div class="row"><span class="label">em-dash</span>
+      <span class="specimen">本来——是的<br>三派——僵持不下<br>文化——科技融合</span></div>
+    <div class="row"><span class="label">2-em dash</span>
+      <span class="specimen">本来⸺是的<br>計畫⸺停擺<br>文化⸺科技</span></div>
+    <div class="row"><span class="label">ellipsis</span>
+      <span class="specimen">他說……不知道<br>接著……是<br>略略略……</span></div>
+    <div class="row"><span class="label">hyphen</span>
+      <span class="specimen">本月－次月<br>9－11<br>1－2－3</span></div>
+    <div class="row"><span class="label">slash</span>
+      <span class="specimen">族語庫／泰雅語<br>路徑＼相對<br>中／英／日</span></div>
+
+    <h2>Within-face pairs (兩字同 face)</h2>
+    <div class="row"><span class="label">Dot + Dot</span>
+      <span class="specimen">中、，後<br>中。、後<br>中，．後<br>中、。後</span></div>
+    <div class="row"><span class="label">Bracket + Bracket</span>
+      <span class="specimen">「『中』」<br>「（中）」<br>『「中」』<br>」「<br>』『</span></div>
+    <div class="row"><span class="label">Mark + Mark</span>
+      <span class="specimen">中：；後<br>中！？後<br>中？：後<br>中！；後</span></div>
+    <div class="row"><span class="label">Curly + Curly</span>
+      <span class="specimen">“‘中’”<br>‘“中”’<br>”“<br>’‘</span></div>
+
+    <h2>Cross-face pairs (兩字不同 face)</h2>
+    <div class="row"><span class="label">Dot + Bracket</span>
+      <span class="specimen">、「中」<br>。『中』<br>，「中」<br>．「中」</span></div>
+    <div class="row"><span class="label">Bracket + Dot</span>
+      <span class="specimen">「中、<br>」、後<br>」。後<br>」，後<br>』．</span></div>
+    <div class="row"><span class="label">Dot + Mark</span>
+      <span class="specimen">中、：後<br>中。！後<br>中，？後<br>中．；</span></div>
+    <div class="row"><span class="label">Mark + Dot</span>
+      <span class="specimen">中：、後<br>中！。後<br>中？，後</span></div>
+    <div class="row"><span class="label">Bracket + Mark</span>
+      <span class="specimen">「：中」<br>」！後<br>「？中？」</span></div>
+    <div class="row"><span class="label">Mark + Bracket</span>
+      <span class="specimen">中：「後」<br>；「中」<br>！『中』<br>？「中」</span></div>
+    <div class="row"><span class="label">Curly + Bracket</span>
+      <span class="specimen">”「中」<br>'「中」<br>」“中”<br>』‘中’</span></div>
+    <div class="row"><span class="label">Bracket + Curly</span>
+      <span class="specimen">「“中”」<br>『‘中’』<br>」”<br>』’</span></div>
+    <div class="row"><span class="label">Curly + Mark</span>
+      <span class="specimen">”：中<br>'；中<br>”！中<br>’？中</span></div>
+    <div class="row"><span class="label">Mark + Curly</span>
+      <span class="specimen">中：“前”<br>中；‘前’<br>！“中”<br>？‘中’</span></div>
+    <div class="row"><span class="label">Curly + Dot</span>
+      <span class="specimen">”、<br>'。<br>”，後<br>’．後</span></div>
+    <div class="row"><span class="label">Dot + Curly</span>
+      <span class="specimen">、“中”<br>。‘中’<br>，”後<br>．’</span></div>
+
+    <h2>Joiner ↔ 其他 face 對成</h2>
+    <div class="row"><span class="label">Mark + Joiner</span>
+      <span class="specimen">中：……後<br>中！——後<br>中？·後<br>中；……</span></div>
+    <div class="row"><span class="label">Joiner + Mark</span>
+      <span class="specimen">……：中<br>——！中<br>·；中<br>……？</span></div>
+    <div class="row"><span class="label">Bracket + Joiner</span>
+      <span class="specimen">「……中」<br>『——中』<br>（·中）<br>」——</span></div>
+    <div class="row"><span class="label">Joiner + Bracket</span>
+      <span class="specimen">……「中」<br>——『中』<br>·（中）</span></div>
+    <div class="row"><span class="label">Dot + Joiner</span>
+      <span class="specimen">、……<br>。——<br>，·<br>．・</span></div>
+
+    <h2>Centered vs Anchored 對比（切上面 Dot/Mark radios 看差異）</h2>
+    <div class="row"><span class="label">dots in paragraph</span>
+      <span class="specimen">委員會迄今召開二十七次會議，產出紀錄三百一十七頁。</span></div>
+    <div class="row"><span class="label">marks in paragraph</span>
+      <span class="specimen">他說：「這個點，到底用哪個字元？」她答：「不知道！」</span></div>
+    <div class="row"><span class="label">mixed dot+mark</span>
+      <span class="specimen">語料蒐集、整理、標注。技術面、人員均無問題；唯一懸而未決的，是一個點：人名間隔號，到底用哪個字元？</span></div>
+
+    <h2>Compound chains (連續 3+ 標點)</h2>
+    <div class="row"><span class="label">closer-burst</span>
+      <span class="specimen">中』」、。<br>後”』」、<br>中？！」』，</span></div>
+    <div class="row"><span class="label">opener-burst</span>
+      <span class="specimen">「『（“‘中’”）』」<br>、「『中』」<br>「「『中』」」</span></div>
+    <div class="row"><span class="label">closer→opener flip</span>
+      <span class="specimen">中」「後<br>中』『後<br>中。「後<br>中、「後<br>中？「後<br>中”「後</span></div>
+    <div class="row"><span class="label">long-form</span>
+      <span class="specimen">「他說：『這個“點”，怎麼辦？』」她回：「不知道。『試試看？』」</span></div>
+    <div class="row"><span class="label">absurd run</span>
+      <span class="specimen">。、，．：；！？”’」』）「『（“‘中</span></div>
+
+    <h2>Curly lang switching (切上面 lang radios 看差異)</h2>
+    <p class="note">curly 在 <code>ja</code> 下走 JP proportional（窄）；在 <code>zh-Hans</code> 下走 SC fullwidth corner 設計（locl 替換）；<code>zh-Hant</code> 介於兩者。</p>
+    <div class="row"><span class="label">curly in text</span>
+      <span class="specimen">他說：“這個‘點’的政治，一場永無止境的美學辯論”。</span></div>
+    <div class="row"><span class="label">curly run</span>
+      <span class="specimen">‘a' "b" ‘中' "文"</span></div>
+
+    <h2>Vertical</h2>
+    <div class="row"><span class="label">within-face vertical</span>
+      <span class="specimen vertical">中、。，．後</span>
+      <span class="specimen vertical">「『中』」</span>
+      <span class="specimen vertical">中：；！？後</span>
+      <span class="specimen vertical">“‘中’”</span>
+    </div>
+    <div class="row"><span class="label">joiner vertical</span>
+      <span class="specimen vertical">中·、——後</span>
+      <span class="specimen vertical">中……、後</span>
+      <span class="specimen vertical">9—11<br>中／英</span>
+    </div>
+    <div class="row"><span class="label">long-form vertical</span>
+      <span class="specimen vertical">他說：「這個『點』，怎麼辦？」她回：「不知道。」</span>
+    </div>
+  </main>
+</body>
+</html>

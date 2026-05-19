@@ -38,7 +38,7 @@
   ],
   "scripts": {
     "fetch:sources": "python scripts/fetch_sources.py",
-    "build": "python scripts/build_fonts.py",
+    "build": "python scripts/build_locale.py && python scripts/build_segment.py",
     "dev": "serve .",
     "prepublishOnly": "pnpm run build"
   },
