@@ -119,6 +119,14 @@ def variants(sources: Path) -> list[SegmentVariant]:
         SegmentVariant(
             punct="dot-centered", style="sans",
             source=sans, unicodes=codepoints.DOT,
+            # Force the 4 cmap dots to self-sub in vert so vertical
+            # layout renders the TC-centred cmap design directly
+            # (without this, JP source's vert sub would route to the
+            # JP upper-right form, which doesn't match the variant's
+            # centred design intent). align_locl then propagates the
+            # self-sub onto locl-target glyphs too, so all lang paths
+            # render the same centred glyph.
+            upright_cps=tuple(codepoints.DOT),
             layout_features=("*",),
             grafts=((sans_tc, (0x3001, 0xFF0C, 0x3002)),),
             outline_shifts={0xFF0E: (300, 334)},
@@ -127,6 +135,7 @@ def variants(sources: Path) -> list[SegmentVariant]:
         SegmentVariant(
             punct="dot-centered", style="serif",
             source=serif, unicodes=codepoints.DOT,
+            upright_cps=tuple(codepoints.DOT),
             layout_features=("*",),
             grafts=((serif_tc, (0x3001, 0xFF0C, 0x3002)),),
             outline_shifts={0xFF0E: (340, 322)},
