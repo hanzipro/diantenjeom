@@ -56,6 +56,7 @@ INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
 from diantenjeom import (
     _outline,
     align_locl,
+    bake_vpal,
     center_punct,
     circle,
     codepoints,
@@ -396,6 +397,16 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     align_cps = getattr(variant, "align_locl_cps", ())
     if align_cps:
         align_locl.install(font, align_cps)
+
+    # Bake vpal's per-glyph YPlacement/YAdvance into vmtx at half-
+    # strength so vertical closing punctuation always renders tight.
+    # An earlier attempt to do this context-aware via GPOS vkrn
+    # PairPos failed for two reasons: (a) Segment family splits punct
+    # across faces, breaking cross-font shaping runs; (b) Chrome
+    # doesn't auto-enable vkrn in vertical mode (see memory:
+    # vertical-no-text-spacing-trim). Always-on baking sidesteps
+    # both. See bake_vpal docstring for the trade-offs.
+    bake_vpal.install(font, scale=0.3)
 
     # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
     # leaves stale bits behind — bit 31 (General Punctuation, where U+2026

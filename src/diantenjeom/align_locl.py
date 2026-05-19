@@ -35,25 +35,30 @@ the entire font's trim. See `docs/chrome-pair-squeeze.md` test 5.
 from __future__ import annotations
 
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.tables import otTables as ot
 
 
 def install(font: TTFont, codepoints: tuple[int, ...]) -> None:
     """For each `cp` in `codepoints`:
 
-    1. **Horizontal**: copy the cmap source glyph's outline + metrics
-       into every `locl` SingleSubst target glyph so locl firing
+    1. **Horizontal outline**: copy cmap source's outline + metrics
+       into every `locl` SingleSubst target glyph, so locl firing
        renders visually identical to cmap.
 
-    2. **Vertical**: rewrite each locl target's `vert`/`vrt2`
-       substitution to point at the same vert target as the cmap
-       source. Without this step, paths diverge: under document
-       `lang` that fires locl, vert tries to substitute on the
-       locl-target glyph and either misses (no sub fires, locl-target
-       renders as horizontal design in vertical slot) or hits a
-       different vert form than the cmap path (e.g. SC FE13 form
-       instead of the variant's intended vert design). This makes
-       both shape paths (with / without locl) converge on the same
-       final glyph in vertical layout too.
+    2. **GSUB vert sub**: rewrite each locl target's `vert`/`vrt2`
+       SingleSubst to point at the same vert target as cmap. Without
+       this, paths diverge: locl-target either misses vert subs (so
+       horizontal design renders in vertical slot) or hits a different
+       vert form than cmap's. Aligning makes both shape paths converge.
+
+    3. **GPOS halt/vhal/palt/vpal**: ensure cmap glyph is covered by
+       each tag (so pair compression fires when cmap renders directly).
+       If cmap isn't covered but any locl target IS, copy the locl
+       target's ValueRecord to cmap. Locl targets aren't touched
+       (they already had their entries from the source). One-way
+       copy avoids double-coverage which would compound advance
+       reductions across multiple SinglePos lookups for the same
+       glyph.
     """
     if not codepoints or "GSUB" not in font:
         return
@@ -65,27 +70,90 @@ def install(font: TTFont, codepoints: tuple[int, ...]) -> None:
         src_name = cmap.get(cp)
         if src_name is None:
             continue
-        locl_targets = _collect_locl_targets(gsub, src_name)
+        locl_targets = [t for t in _collect_locl_targets(gsub, src_name)
+                        if t != src_name]
 
         # 1. Horizontal: copy outline + metrics into locl targets.
         for tgt_name in locl_targets:
-            if tgt_name == src_name:
-                continue
             _copy_charstring(font, src_name, tgt_name)
             _copy_metrics(font, src_name, tgt_name)
 
-        # 2. Vertical: find cmap's vert target, and route locl targets
-        #    to the same. If cmap has no vert sub, treat as self —
-        #    locl target's vert sub becomes self too (i.e. render as
-        #    locl-target glyph itself, whose horizontal outline we just
-        #    aligned to cmap).
+        # 2. Vertical: find cmap's vert target, route locl targets
+        #    to the same. If cmap has no vert sub, treat as self.
         v_target = _find_vert_target(gsub, src_name)
         if v_target is None:
             v_target = src_name
         for tgt_name in locl_targets:
-            if tgt_name == src_name:
-                continue
             _set_vert_sub(gsub, tgt_name, v_target)
+
+        # 3. GPOS: add cmap glyph to each halt/vhal/palt/vpal coverage
+        #    if it's missing, using a locl-target's ValueRecord as
+        #    template. Locl targets are left alone.
+        for tag in ("halt", "vhal", "palt", "vpal"):
+            _ensure_cmap_covered(font, tag, src_name, locl_targets)
+
+
+def _ensure_cmap_covered(
+    font: TTFont,
+    tag: str,
+    cmap_glyph: str,
+    locl_targets: list[str],
+) -> None:
+    """If `cmap_glyph` isn't in any `tag` SinglePos coverage but some
+    `locl_targets` glyph IS, copy that locl-target's ValueRecord into
+    the lookup that contains it, adding `cmap_glyph` to coverage."""
+    if "GPOS" not in font:
+        return
+    gpos = font["GPOS"].table
+
+    # First pass: is cmap_glyph already covered anywhere under this tag?
+    # NOTE: don't filter by LookupType — vpal etc. are often type 9
+    # (Extension) wrapping a type 1 SinglePos. ExtSubTable deref handles
+    # both transparently. Skip subtables without a Coverage attribute
+    # (e.g., type 2 PairPos has different shape).
+    for fr in gpos.FeatureList.FeatureRecord:
+        if fr.FeatureTag != tag:
+            continue
+        for li in fr.Feature.LookupListIndex:
+            lookup = gpos.LookupList.Lookup[li]
+            for st in lookup.SubTable:
+                while hasattr(st, "ExtSubTable"):
+                    st = st.ExtSubTable
+                if not hasattr(st, "Coverage"):
+                    continue
+                if cmap_glyph in st.Coverage.glyphs:
+                    return  # already covered, nothing to do
+
+    # Second pass: find first locl-target with an entry and clone it.
+    for fr in gpos.FeatureList.FeatureRecord:
+        if fr.FeatureTag != tag:
+            continue
+        for li in fr.Feature.LookupListIndex:
+            lookup = gpos.LookupList.Lookup[li]
+            for st in lookup.SubTable:
+                while hasattr(st, "ExtSubTable"):
+                    st = st.ExtSubTable
+                if not hasattr(st, "Coverage"):
+                    continue
+                cov = st.Coverage.glyphs
+                donor = next((L for L in locl_targets if L in cov), None)
+                if donor is None:
+                    continue
+                idx = cov.index(donor)
+                if st.Format == 1:
+                    cov.append(cmap_glyph)
+                else:
+                    donor_vr = st.Value[idx]
+                    new_vr = ot.ValueRecord()
+                    for attr in ("XPlacement", "YPlacement",
+                                 "XAdvance", "YAdvance"):
+                        v = getattr(donor_vr, attr, None)
+                        if v:
+                            setattr(new_vr, attr, v)
+                    cov.append(cmap_glyph)
+                    st.Value.append(new_vr)
+                    st.ValueCount = len(st.Value)
+                return
 
 
 def _collect_locl_targets(gsub_table, src_name: str) -> set[str]:
