@@ -1,6 +1,6 @@
 # diantenjeom
 
-**點 · 点 · 점** — /ti̯ɛn˨˩˦ teɴ tɕʌm/
+**點 · 点 · 점** — /ti̯ɛn˨˩˦ teɴ tɕʌm/, or, as you might say in English, /ˈdiː.æn.tɛn.dʒəm/
 
 A set of punctuation-only CJK fonts, extracted from
 Noto Sans CJK +
