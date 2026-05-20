@@ -1,7 +1,7 @@
 :root {
   & {
-    --sans: 'Diantenjeom Sans', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
-    --serif:  'Diantenjeom Serif', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+    --sans: 'Diantenjeom Sans JIS', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif:  'Diantenjeom Serif JIS', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
 
     box-sizing: border-box;
     padding-block: 4rem 10rem;
@@ -90,13 +90,13 @@ article {
     font-family: var(--serif);
   }
 
-  &.centered {
-    --sans: 'Diantenjeom Sans Centered', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
-    --serif: 'Diantenjeom Serif Centered', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+  &.moe {
+    --sans: 'Diantenjeom Sans MOE', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif: 'Diantenjeom Serif MOE', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
   }
-  &.sc {
-    --sans: 'Diantenjeom Sans SC', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
-    --serif: 'Diantenjeom Serif SC', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
+  &.gb {
+    --sans: 'Diantenjeom Sans GB', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
+    --serif: 'Diantenjeom Serif GB', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
   }
   &.binomoto {
     --sans: 'Binomoto Sans', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;

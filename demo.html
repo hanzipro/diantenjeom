@@ -6,9 +6,9 @@
 <title>diantenjeom — JP demo</title>
 <style>
   @font-face {
-    font-family: 'Diantenjeom Sans JP';
-    src: url('./dist/fonts/diantenjeom-sans-jp.woff2') format('woff2-variations'),
-         url('./dist/fonts/diantenjeom-sans-jp.woff2') format('woff2');
+    font-family: 'Diantenjeom Sans JIS';
+    src: url('./dist/fonts/diantenjeom-sans-jis.woff2') format('woff2-variations'),
+         url('./dist/fonts/diantenjeom-sans-jis.woff2') format('woff2');
     font-weight: 100 900;
     font-display: swap;
     unicode-range:
@@ -19,7 +19,7 @@
 
   :root {
     /* Punctuation comes from Diantenjeom; Han falls through to system JP font. */
-    --jp: 'Diantenjeom Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+    --jis: 'Diantenjeom Sans JIS', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
     /* Baseline: no diantenjeom, system handles everything. */
     --jp-bare: 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
 
@@ -29,7 +29,7 @@
   }
 
   body {
-    font-family: var(--jp);
+    font-family: var(--jis);
     font-weight: 300;
     margin: 2rem auto;
     max-width: 64rem;
@@ -68,7 +68,7 @@
 
 <h1>diantenjeom — Noto Sans JP 標點字體 demo</h1>
 <p style="color:#666;font-size:.9rem">
-  上方一欄掛 <code>Diantenjeom Sans JP</code>，下方 <code>.bare</code> 是純系統字體做對照。
+  上方一欄掛 <code>Diantenjeom Sans JIS</code>，下方 <code>.bare</code> 是純系統字體做對照。
   Han 字落到系統字體，只有標點由 diantenjeom 提供。
 </p>
 

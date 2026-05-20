@@ -30,12 +30,19 @@ face.
 Each style ships as a separate variable font; pick by punctuation positioning
 convention, not by language tag.
 
-| Family                          | Style    | Punctuation convention                              |
-|---------------------------------|----------|-----------------------------------------------------|
-| `Diantenjeom Sans`              | Sans     | JP-style — recommended default. 、，。 hug the top   |
-| `Diantenjeom Serif`             | Serif    | JP-style — recommended default                       |
-| *(Planned)* `… Centered`        | both     | TW MOE — 、，。 centred                              |
-| *(Planned)* `… GB`              | both     | Mainland — 、，。：；！？ all side-aligned             |
+Three punctuation conventions, each named after the authoritative
+regional standard. Naming is intentionally decoupled from text locale,
+so you can pair any variant with any CJK text font (e.g. Japanese text
+with MOE punctuation, TC text with JIS punctuation).
+
+| Family                          | Style    | Punctuation convention                                |
+|---------------------------------|----------|-------------------------------------------------------|
+| `Diantenjeom Sans JIS`          | Sans     | JIS X 4051 — 、，。 hug the top-left corner of the em |
+| `Diantenjeom Serif JIS`         | Serif    | JIS X 4051                                            |
+| `Diantenjeom Sans MOE`          | Sans     | 教育部《重訂標點符號手冊》— 、，。 centred             |
+| `Diantenjeom Serif MOE`         | Serif    | 同上                                                  |
+| `Diantenjeom Sans GB`           | Sans     | GB/T 15834 — 、，。：；！？ side-aligned              |
+| `Diantenjeom Serif GB`          | Serif    | 同上                                                  |
 
 Each variant exposes the full `wght` axis (Sans 100–900, Serif 200–900) with
 named instances on the CSS-standard grid: Thin / ExtraLight / Light / Regular
@@ -60,7 +67,7 @@ change. More docs and examples to come.
     disabled **font-wide** (not just for the disagreeing glyph).
   - A from-scratch custom font is unaffected, **provided the four
     dots are designed consistently** — all corner-attached or all
-    centred. Mixed-design subsets (Diantenjeom Centered's case: TC
+    centred. Mixed-design subsets (Diantenjeom MOE's case: TC
     centred `、/。/，` + JP corner `．`) trigger the gate.
   - Suggested fixes in the draft, in order of effort: surface the
     gate to DevTools → downgrade per-group instead of font-wide →

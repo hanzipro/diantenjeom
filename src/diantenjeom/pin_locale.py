@@ -32,8 +32,10 @@ from fontTools.ttLib import TTFont
 _LOCALE_VARIANT_TAGS = ("vert", "vrt2")
 
 
-def _locale_vert_lookups(table, locale: str) -> list[int] | None:
-    """Return the lookup list that `locale`'s `vert` feature uses.
+def _locale_feature_lookups(
+    table, locale: str, feature_tag: str
+) -> list[int] | None:
+    """Return the lookup list that `locale`'s `feature_tag` feature uses.
 
     `locale="JAN"` resolves to DefaultLangSys (Noto CJK Source Han uses
     JAN as the script default). Anything else walks LangSysRecord for a
@@ -53,9 +55,32 @@ def _locale_vert_lookups(table, locale: str) -> list[int] | None:
         if target_langsys is None:
             continue
         for fi in target_langsys.FeatureIndex:
-            if feature_list[fi].FeatureTag == "vert":
+            if feature_list[fi].FeatureTag == feature_tag:
                 return list(feature_list[fi].Feature.LookupListIndex)
     return None
+
+
+def _locale_vert_lookups(table, locale: str) -> list[int] | None:
+    return _locale_feature_lookups(table, locale, "vert")
+
+
+def _alias_locl_to_locale(table, locale: str) -> None:
+    """Rewrite every `locl` FeatureRecord to reference `locale`'s locl
+    lookup list. Makes the locl substitution invariant across document
+    `lang`: whatever lang the page sets, the same locl lookup list
+    fires (and thus the same glyph substitutions), preserving the
+    face's design.
+
+    Used by GB variant (pin to ZHS) so that ZHT/ZHH/JAN locl can't
+    overwrite our SC-style cmap design under non-zh-Hans document lang.
+    """
+    lookups = _locale_feature_lookups(table, locale, "locl")
+    if lookups is None:
+        return
+    for fr in table.FeatureList.FeatureRecord:
+        if fr.FeatureTag == "locl":
+            fr.Feature.LookupListIndex = list(lookups)
+            fr.Feature.LookupCount = len(lookups)
 
 
 def _alias_vert_to_locale(table, locale: str) -> None:
@@ -172,6 +197,7 @@ def install(
     font: TTFont,
     extra_upright: tuple[int, ...] = (),
     pin_to_locale: str = "JAN",
+    pin_locl_to: str | None = None,
 ) -> None:
     """Pin vert/vrt2 behaviour to `pin_to_locale` regardless of the
     document's OT language tag, plus add identity self-subst for upright
@@ -193,6 +219,8 @@ def install(
     if "GSUB" in font:
         gsub = font["GSUB"].table
         _alias_vert_to_locale(gsub, pin_to_locale)
+        if pin_locl_to is not None:
+            _alias_locl_to_locale(gsub, pin_locl_to)
         _force_upright(font, gsub, extra_upright)
         _add_upright_self_substs(font, gsub, pin_to_locale, extra_upright)
         _empty_orphan_lookups(gsub)

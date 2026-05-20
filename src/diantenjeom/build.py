@@ -155,23 +155,26 @@ class Variant:
     # "ZHS" gives mainland-style vertical (no ：rotation, FE13-FE16 for
     # !:;? presentation forms, FE41-FE44 for vertical brackets).
     pin_to_locale: str = "JAN"
+    # If set, alias every `locl` FeatureRecord to this langsys's locl
+    # lookup list. Makes locl behaviour invariant across the document's
+    # `lang`. Used by GB variant (pin to "ZHS") so ZHT locl can't
+    # substitute our SC-design cmap glyphs to TC-centred alternates
+    # under `lang="zh-Hant"`. See `pin_locale._alias_locl_to_locale`.
+    pin_locl_to: str | None = None
 
     @property
     def stem(self) -> str:
-        suffix = f"-{self.punct}" if self.punct else ""
-        return f"diantenjeom-{self.style}{suffix}"
+        return f"diantenjeom-{self.style}-{self.punct}"
 
     @property
     def family(self) -> str:
-        # Short locale codes (sc/tc/jp/kr) stay upper-case; longer style
-        # words like "centered" get title-cased.
-        if not self.punct:
-            suffix = ""
-        elif len(self.punct) <= 3:
-            suffix = f" {self.punct.upper()}"
-        else:
-            suffix = f" {self.punct.title()}"
-        return f"Diantenjeom {self.style.title()}{suffix}"
+        # `punct` is always a short standards-body acronym (jis / moe /
+        # gb); upper-case it for the user-facing family name. The
+        # naming decouples punctuation style from text locale: callers
+        # can pair `Diantenjeom JIS` with any CJK text font, mix and
+        # match per design preference. See notes/punctuation-positioning-
+        # history.md for why standards-based naming was chosen.
+        return f"Diantenjeom {self.style.title()} {self.punct.upper()}"
 
 
 def _rename_family(font: TTFont, family: str) -> None:
@@ -201,8 +204,11 @@ def _rename_family(font: TTFont, family: str) -> None:
         slots.setdefault(rec.nameID, set()).add((rec.platformID, rec.platEncID, rec.langID))
 
     for nid, value in payloads.items():
-        # If the source didn't have this ID at all, seed the standard slots.
-        existing = slots.get(nid) or {(3, 1, 0x409), (1, 0, 0)}
+        # If the source didn't have this ID at all, seed Windows only.
+        # Previously also seeded (1, 0, 0) Macintosh, but the subsetter
+        # already stripped platform=1 records via name_legacy=False, and
+        # re-adding them here would defeat that optimization.
+        existing = slots.get(nid) or {(3, 1, 0x409)}
         for plat, enc, lang in existing:
             name.setName(value, nid, plat, enc, lang)
 
@@ -263,7 +269,7 @@ def _canonicalize_instances(font: TTFont, postscript: str) -> None:
             if rec.nameID == sample_id:
                 slots.add((rec.platformID, rec.platEncID, rec.langID))
     if not slots:
-        slots = {(3, 1, 0x409), (1, 0, 0)}
+        slots = {(3, 1, 0x409)}
 
     next_id = 300
     new_instances: list[NamedInstance] = []
@@ -286,14 +292,40 @@ def _canonicalize_instances(font: TTFont, postscript: str) -> None:
 
     fvar.instances = new_instances
 
+    # Drop Source Han's old per-instance name records (IDs 266-279).
+    # fvar.instances no longer points at them (now uses 300+), and STAT
+    # references only 256-265 (axis name + axis values + elided
+    # fallback). 266-279 are orphans that the subsetter retained as
+    # potential fvar dependencies — safe to remove post-canonicalisation.
+    name.names = [r for r in name.names if not (266 <= r.nameID <= 279)]
+
 
 def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     font = TTFont(variant.source)
 
     opts = Options()
     opts.layout_features = list(variant.layout_features) if variant.layout_features else KEEP_FEATURES
-    opts.name_IDs = ["*"]
-    opts.name_legacy = True
+    # Name table whitelist — was `["*"]` which retained every record
+    # including Source Han's 266-279 per-instance pairs that we later
+    # supersede with 300-317 via `_canonicalize_instances`. Drop those
+    # orphans, plus all Macintosh-platform (legacy) records and non-
+    # English localized records.
+    #   0-21    : standard family/style/copyright/credits + OFL required
+    #   256-265 : STAT references these (axis name + 7 axis-value names
+    #             + ElidedFallbackNameID) — must keep
+    #   300-317 : our canonical CSS-standard instance names — added
+    #             post-subset by _canonicalize_instances; allowlisted
+    #             here so the subsetter doesn't strip them if present
+    opts.name_IDs = (
+        list(range(0, 22))
+        + list(range(256, 266))
+        + list(range(300, 318))
+    )
+    opts.name_legacy = False           # drop Macintosh (platform=1) records
+    # name_languages must stay "*" — fontTools' subsetter doesn't
+    # recognize ISO 639 tags like "en" here; passing them silently
+    # drops every record. The langID filter happens implicitly when
+    # name_legacy=False trims to platforms 0/3.
     opts.name_languages = ["*"]
     opts.glyph_names = True
     opts.legacy_kern = True
@@ -302,7 +334,9 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     opts.recalc_bounds = True
     opts.recalc_timestamp = False
     opts.canonical_order = True
-    opts.drop_tables.remove("DSIG") if "DSIG" in opts.drop_tables else None
+    # DSIG (digital signature) is empty-padding leftover from Adobe's
+    # build pipeline — not used by any modern renderer. Default
+    # drop_tables already includes it; let it be dropped.
     # Keep VORG/vhea/vmtx/VVAR — vertical metrics tables are essential for
     # `writing-mode: vertical-rl`.
 
@@ -314,7 +348,10 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # (ZHT/ZHS/KOR/etc.) falls back to JAN-style vert wiring. Without this
     # a page with `lang="zh-Hant"` would resolve to a vert feature record
     # that omits some substitutions — e.g. ：(U+FF1A) wouldn't rotate.
-    pin_locale.install(font, variant.upright_cps, variant.pin_to_locale)
+    pin_locale.install(
+        font, variant.upright_cps,
+        variant.pin_to_locale, variant.pin_locl_to,
+    )
     for graft_source, graft_cps in variant.grafts:
         if graft_cps:
             graft.install(font, graft_source, graft_cps, variant.hmtx_graft_cps)
@@ -432,19 +469,23 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Scope: JP-style sans + serif (the recommended default; no suffix in
-    # the family name). Add `punct="centered"` / `punct="gb"` variants
-    # here as those positioning styles come online.
+    # Three punctuation variants per style — naming follows the
+    # authoritative regional standards: JIS X 4051 (Japan), 教育部
+    # 重訂標點符號手冊 / MoE (Taiwan & 港澳), and GB/T 15834 (Mainland).
+    # Standards-based naming decouples punctuation style from text
+    # locale so callers can mix-and-match (e.g. Japanese text with
+    # MoE punctuation, TC text with JIS punctuation). See
+    # notes/punctuation-positioning-history.md for the rationale.
     variants: list[Variant] = [
         Variant(
-            punct="",
+            punct="jis",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.JP,
             vert_nudges=vert_nudge.JP,
         ),
         Variant(
-            punct="",
+            punct="jis",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.JP,
@@ -462,7 +503,7 @@ def main() -> None:
         # is ZHT locl swaps under lang="zh-Hant" (．/！/？/：/；/etc.).
         # See docs/chrome-pair-squeeze.md.
         Variant(
-            punct="centered",
+            punct="moe",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.JP,
@@ -475,11 +516,11 @@ def main() -> None:
             # ．(FF0E) delegated to the JP-default sans woff2 via the
             # @font-face unicode-range split — keeps ．JP-corner without
             # tripping Chrome's han_kerning four-dot consistency gate.
-            css_delegate_donor_stem="diantenjeom-sans",
+            css_delegate_donor_stem="diantenjeom-sans-jis",
             css_delegate_cps=(0xFF0E,),
         ),
         Variant(
-            punct="centered",
+            punct="moe",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.JP,
@@ -489,7 +530,7 @@ def main() -> None:
             grafts=(
                 (args.sources / "NotoSerifCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
             ),
-            css_delegate_donor_stem="diantenjeom-serif",
+            css_delegate_donor_stem="diantenjeom-serif-jis",
             css_delegate_cps=(0xFF0E,),
         ),
         # SC (mainland GB) — three locale-specific behaviours layered on JP
@@ -507,7 +548,7 @@ def main() -> None:
         #      SC's default ZHS lookup chain via cmap→vert).
         # 、，。．are identical between SC and JP, so they stay JP-sourced.
         Variant(
-            punct="sc",
+            punct="gb",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
             unicodes=codepoints.SC,
@@ -516,6 +557,7 @@ def main() -> None:
             # (FE13 / FE14) stay at source position.
             vert_nudges={**vert_nudge.JP, 0xFF01: -50, 0xFF1F: -50},
             pin_to_locale="ZHS",
+            pin_locl_to="ZHS",
             # Retain every source feature (incl. locl). Required for Chrome's
             # text-spacing-trim gate — `locl` absent => trim disabled font-wide
             # (see docs/chrome-pair-squeeze.md). Side effect: under lang="ja"
@@ -539,12 +581,13 @@ def main() -> None:
             center_punct_cps=(),
         ),
         Variant(
-            punct="sc",
+            punct="gb",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
             unicodes=codepoints.SC,
             vert_nudges={**vert_nudge.JP_SERIF, 0xFF01: -50, 0xFF1F: -50},
             pin_to_locale="ZHS",
+            pin_locl_to="ZHS",
             layout_features=("*",),
             grafts=(
                 (args.sources / "NotoSerifCJKsc-VF.otf",
