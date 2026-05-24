@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>@han-css/fonts — multilingual demo</title>
+  <link rel="stylesheet" href="dist/diantenjeom.css">
+
+  <style>
+    :root {
+      & {
+        --sans: 'Diantenjeom Sans MOE', 'Hiragino Sans', 'Hiragino Sans GB',
+          'Hiragino Sans CNS', 'PingFang TC', 'PingFang SC',
+          'Nanum Gothic', system-ui, sans-serif;
+        --serif: 'Diantenjeom Serif MOE', 'Hiragino Mincho ProN',
+          'Songti TC', 'Songti SC',
+          'AppleMyungjo', 'Nanum Myeongjo', serif;
+
+        box-sizing: border-box;
+        padding-block: 4rem 10rem;
+        margin: 0;
+
+        font-size: 16px;
+        font-family: var(--sans);
+        text-spacing-trim: trim-start;
+      }
+
+      *,
+      *::before,
+      &::after {
+        box-sizing: inherit;
+      }
+    }
+
+    body {
+      margin: 0;
+    }
+
+    body>header {
+      & {
+        position: fixed;
+        inset: 0 auto auto 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: .5rem 1.5rem;
+        min-block-size: 3rem;
+        inline-size: 100%;
+        line-height: 1;
+        background-color: #f3f3f3;
+        border-block-end: 1px solid #cccccc;
+        z-index: 10;
+        font-size: 13px;
+      }
+
+      fieldset {
+        border: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+      }
+
+      label {
+        display: flex;
+        align-items: center;
+        gap: .25em;
+      }
+
+      strong {
+        font-weight: 600;
+        color: #555;
+        margin-inline-end: .15rem;
+      }
+    }
+
+    /* Punctuation variant — flip CSS var per radio selection. CSS
+       drives everything via :has(); JS only handles weight + storage. */
+    body:has(input[name="punct"][value="jis"]:checked) {
+      --sans: 'Diantenjeom Sans JIS', 'Hiragino Sans', 'Hiragino Sans GB',
+        'Hiragino Sans CNS', 'PingFang TC', 'PingFang SC',
+        'Nanum Gothic', system-ui, sans-serif;
+      --serif: 'Diantenjeom Serif JIS', 'Hiragino Mincho ProN',
+        'Songti TC', 'Songti SC',
+        'AppleMyungjo', 'Nanum Myeongjo', serif;
+    }
+
+    body:has(input[name="punct"][value="gb"]:checked) {
+      --sans: 'Diantenjeom Sans GB', 'Hiragino Sans', 'Hiragino Sans GB',
+        'Hiragino Sans CNS', 'PingFang TC', 'PingFang SC',
+        'Nanum Gothic', system-ui, sans-serif;
+      --serif: 'Diantenjeom Serif GB', 'Hiragino Mincho ProN',
+        'Songti TC', 'Songti SC',
+        'AppleMyungjo', 'Nanum Myeongjo', serif;
+    }
+
+    body:has(input[name="punct"][value="kv"]:checked) {
+      --sans: 'Diantenjeom Sans KV', 'Hiragino Sans', 'Hiragino Sans GB',
+        'Hiragino Sans CNS', 'PingFang TC', 'PingFang SC',
+        'Nanum Gothic', system-ui, sans-serif;
+      --serif: 'Diantenjeom Serif KV', 'Hiragino Mincho ProN',
+        'Songti TC', 'Songti SC',
+        'AppleMyungjo', 'Nanum Myeongjo', serif;
+    }
+
+    /* Smooth scroll to anchored articles when hash changes. */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Left sidebar TOC — sticky language switcher, like vite docs'
+       "on this page" panel but pinned to the left edge. Stays in
+       horizontal-tb regardless of the article's writing-mode. */
+    nav.lang-toc {
+      & {
+        position: fixed;
+        top: 6rem;
+        left: 1rem;
+        writing-mode: horizontal-tb;
+        display: flex;
+        flex-direction: column;
+        gap: .15em;
+        font-size: 12px;
+        z-index: 5;
+      }
+
+      a {
+        & {
+          color: #888;
+          text-decoration: none;
+          padding: .25em .75em;
+          border-inline-start: 2px solid transparent;
+          transition: color .15s, border-color .15s, font-weight .15s;
+        }
+
+        &:hover {
+          color: #333;
+        }
+
+        &[aria-current="true"] {
+          color: #000;
+          border-inline-start-color: #000;
+          font-weight: 600;
+        }
+      }
+    }
+
+    article {
+      & {
+        /* margin: 0 auto; */
+        position: relative;
+        margin-block-end: 6em;
+        padding-inline: 1em;
+        /* inline-size: clamp(12em, 100%, 40em); */
+        block-size: 40em;
+        columns: auto 10em / 40em;
+        font-family: var(--sans);
+        font-weight: 300;
+        line-height: 1.75;
+        text-align: justify;
+        scroll-margin-top: 5rem;
+      }
+
+      &:last-of-type {
+        margin-block-end: 0;
+      }
+
+      h1 {
+        & {
+          position: absolute;
+          font-size: 1.75em;
+          font-weight: bolder;
+          transform: translateX(100%);
+        }
+
+        span {
+          display: block;
+          font-weight: 200;
+          font-size: .55em;
+        }
+      }
+
+      h2 {
+        font-weight: bolder;
+      }
+
+      :where(h1, h2, h3, h4, h5, h6, p) {
+        margin: 0;
+      }
+
+      p {
+        & {
+          text-indent: 1em;
+        }
+
+        &:first-of-type {
+          text-indent: 0;
+        }
+      }
+
+      code {
+        font-family: ui-monospace, monospace;
+        font-size: .85em;
+        background: rgba(0, 0, 0, .05);
+        padding: 0 .3em;
+        border-radius: 3px;
+      }
+
+      em {
+        text-emphasis: filled circle;
+        -webkit-text-emphasis: filled circle;
+        font-style: inherit;
+      }
+
+      /* Toggles via header :has() sibling selector — mirrors article.html. */
+      header:has(input[name="vertical"]:checked)~& {
+        writing-mode: vertical-rl;
+      }
+
+      header:has(input[name="serif"]:checked)~& {
+        font-family: var(--serif);
+      }
+    }
+  </style>
+
+  <script type="module">
+    // localStorage-backed preference persistence + weight slider wiring.
+    // Everything else (vertical / serif / lang / punct) is pure CSS via
+    // :has() — see <style> above.
+    const STORAGE_KEY = 'diantenjeom-prefs';
+
+    function restorePrefs() {
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { }
+      for (const [name, value] of Object.entries(saved)) {
+        for (const $el of document.querySelectorAll(`input[name="${name}"]`)) {
+          if ($el.type === 'checkbox') $el.checked = (value === true);
+          else if ($el.type === 'radio') $el.checked = ($el.value === value);
+          else if ($el.type === 'range') $el.value = value;
+        }
+      }
+    }
+
+    function savePrefs() {
+      const prefs = {};
+      for (const $el of document.querySelectorAll('input[name]')) {
+        if ($el.type === 'checkbox') prefs[$el.name] = $el.checked;
+        else if ($el.type === 'radio' && $el.checked) prefs[$el.name] = $el.value;
+        else if ($el.type === 'range') prefs[$el.name] = $el.value;
+      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch { }
+    }
+
+    function applyWeight() {
+      const $w = document.querySelector('input[name=weight]');
+      document.querySelector('output[name=weight]').textContent = $w.value;
+      for (const $a of document.querySelectorAll('article')) {
+        $a.style.fontWeight = $w.value;
+      }
+    }
+
+    // ---- Language switcher: hash-routed scrollspy. No localStorage.
+    // <nav class="lang-toc"> links to #zh-Hant / #ja / etc. As the user
+    // scrolls past an article, replaceState updates the hash and the
+    // active link marker. Click on a link → smooth scroll + hash update.
+    // Browser back/forward triggers hashchange → smooth scroll.
+    const articles = document.querySelectorAll('article[data-lang]');
+    const navLinks = document.querySelectorAll('nav.lang-toc a');
+    let activeLang = null;
+    let programmaticScrollUntil = 0;
+
+    function setActive(lang, { skipHash = false } = {}) {
+      if (lang === activeLang) return;
+      activeLang = lang;
+      for (const a of navLinks) {
+        a.setAttribute('aria-current', a.hash === '#' + lang ? 'true' : 'false');
+      }
+      // <html lang> follows the active article for IME / a11y hints.
+      // Per-article `lang` attributes still override this for the actual
+      // content; root lang is just the "page-level" default.
+      document.documentElement.lang = lang;
+      if (!skipHash) {
+        const url = new URL(window.location.href);
+        url.hash = lang;
+        window.history.replaceState(null, '', url);
+      }
+    }
+
+    // IntersectionObserver tracks which article occupies the viewport
+    // middle band. rootMargin clips the visible region to a 40% middle
+    // slice so we don't flip between adjacent articles at their borders.
+    const observer = new IntersectionObserver((entries) => {
+      if (Date.now() < programmaticScrollUntil) return;
+      let best = null;
+      let bestRatio = 0;
+      for (const e of entries) {
+        if (e.isIntersecting && e.intersectionRatio > bestRatio) {
+          best = e.target;
+          bestRatio = e.intersectionRatio;
+        }
+      }
+      if (best) setActive(best.dataset.lang);
+    }, {
+      rootMargin: '-30% 0px -30% 0px',
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    });
+    for (const a of articles) observer.observe(a);
+
+    function scrollToLang(lang, behavior = 'smooth') {
+      const target = document.getElementById(lang);
+      if (!target) return false;
+      // Suppress IntersectionObserver-driven hash updates during the
+      // scroll animation, otherwise scrolling past intermediate articles
+      // would clobber the user's intended target.
+      programmaticScrollUntil = Date.now() + 1000;
+      target.scrollIntoView({ behavior, block: 'start' });
+      setActive(lang, { skipHash: false });
+      return true;
+    }
+
+    // Click on TOC link: prevent default jump, do smooth scroll instead.
+    for (const a of navLinks) {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        scrollToLang(a.hash.slice(1));
+      });
+    }
+
+    // Back / forward buttons or manual hash edit.
+    window.addEventListener('hashchange', () => {
+      const lang = window.location.hash.slice(1);
+      if (lang) scrollToLang(lang);
+    });
+
+    // On load: honour initial hash if valid, otherwise mark first article
+    // active without modifying the URL.
+    const initialLang = window.location.hash.slice(1);
+    if (initialLang && document.getElementById(initialLang)) {
+      scrollToLang(initialLang, 'auto');
+    } else {
+      setActive(articles[0].dataset.lang, { skipHash: true });
+    }
+
+    restorePrefs();
+    applyWeight();
+
+    document.querySelector('input[name=weight]').addEventListener('input', () => {
+      applyWeight(); savePrefs();
+    });
+    document.body.addEventListener('change', savePrefs);
+  </script>
+</head>
+
+<body>
+  <header>
+    <fieldset>
+      <strong>排</strong>
+      <label><input type="checkbox" name="vertical" checked> 直排</label>
+      <label><input type="checkbox" name="serif"> 明體</label>
+    </fieldset>
+    <fieldset>
+      <strong>標點</strong>
+      <label><input type="radio" name="punct" value="jis"> JIS</label>
+      <label><input type="radio" name="punct" value="moe" checked> MOE</label>
+      <label><input type="radio" name="punct" value="gb"> GB</label>
+      <label><input type="radio" name="punct" value="kv"> KV</label>
+    </fieldset>
+    <fieldset>
+      <strong>字重</strong>
+      <output name="weight">300</output>
+      <input type="range" name="weight" min="100" max="900" step="10" value="300">
+    </fieldset>
+  </header>
+
+  <nav class="lang-toc" aria-label="language">
+    <a href="#zh-Hant">繁中</a>
+    <a href="#ja">日本語</a>
+    <a href="#zh-Hans">简中</a>
+    <a href="#ko">한국어</a>
+  </nav>
+
+  <!-- ===== Traditional Chinese (zh-Hant) ===== -->
+  <article id="zh-Hant" data-lang="zh-Hant" lang="zh-Hant">
+    <h1>
+      <span>【文化科技融合】</span>
+      間隔號標準之爭　三派僵持不下<br />
+      計畫語料已完成九十四·七％　委員會：尚在審議
+    </h1>
+
+    <p>【本報文化特派員　吳佳蓉　專電】《原住民族數位語言保存計畫》昨日邁入停擺第四年。語料蒐集、整理、標注工作進度達九十四·七％，技術面、人員均無問題；唯一懸而未決的，是一個點：人名間隔號，到底用哪個字元？
+
+    <h2>委員會內部分裂為三派</h2>
+    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。<em>「我們祖先就是這樣寫的，這個點才是我們的點。」</em>
+
+    <p>
+      「・派」（<code>U+30FB</code>）由計畫主持人漢那・伍茂博士—現任三派調解人，成效如前述—領銜。漢那博士指出，<code>U+30FB</code>已獲《全球語言標準公約》〈附件七〉採認，字形端正，理應統一。
+
+    <p>
+      「句號派」（<code>U+FF0E</code>）以陳子晴（族名使用·，個人名片一律印作「陳子晴文化組」）為代表。她翻出一份國際語言學學會〔廿三屆年報〕，封面標題以GB式彎引號排印：“‘點’的政治⸺一場永無止境的美學辯論”——她表示，光看標題就贏了。她的主張是：「句號放在名字中間，點偏在字旁，那種錯位感才有美感——誰說語意對了才叫對？」
+
+    <p><code>U+FF0E</code>為全形句號，語意上並非間隔號；「句號派」亦承認此點，並表示：「我們知道，這才是重點。」
+
+    <p>委員會迄今召開二十七次會議，產出紀錄三百一十七頁：前三頁討論語料；後三百一十四頁討論這個點。
+
+    <p>次長林淑芬宣示：「本委員會絕不以多數決強行壓制少數！」現場掌聲熱烈；語料庫仍為空。
+
+    <p>對此，武那·禮告態度一貫簡短：『這個點，我自己決定。』翻譯員事後轉述其族語原話大意：<span lang="en">‘This dot is mine,’ he said, “not…yours.”</span>
+
+    <p>語料庫後台路徑格式如「族語庫／泰雅語＼音檔」，語料存入率……九十四·七％．⸺待命中——……
+
+    <p>目前存有三份草案：〔草案一〕採·；〔草案二〕採・；〔草案三〕採．，並附四十頁《標點民主化：以全形句號作間隔號之哲學基礎》，同樣在審議中。
+
+    <p>原委會表示，計畫將於本月－次月完成評選並重新排期。計畫能否如期完成？各界均拭目以待。
+  </article>
+
+  <!-- ===== Japanese (ja) ===== -->
+  <article id="ja" data-lang="ja" lang="ja">
+    <h1>
+      <span>【文化科技融合】</span>
+      間隔号標準論争　三派対峙<br />
+      計画コーパス進捗九十四·七％　委員会：審議中
+    </h1>
+
+    <p>
+      【本紙文化特派員　ウ・ジアロン　専電】《先住民族デジタル言語保存計画》は昨日、停滞第四年に突入した。コーパス収集、整理、注釈付け作業の進捗は九十四·七％に達し、技術面、人員ともに問題はない；唯一未解決なのは、ひとつの点である：人名間隔号に、結局どの文字を用いるべきか？
+
+    <h2>委員会内部は三派に分裂</h2>
+    <p>「·派」（<code>U+00B7</code>）は長老ムナ·リガオを精神的指導者とする。<em>「我々の祖先はこのように書いていた。この点こそ我々の点である。」</em>
+
+    <p>
+      「・派」（<code>U+30FB</code>）は計画主宰者ハンナ・ウーマオ博士―現任の三派調停人、成果は前述のとおり―が領袖を務める。ハンナ博士は、<code>U+30FB</code>が既に《世界言語標準条約》〈附則第七〉に採用されており、字形が端正で、統一すべきだと指摘する。
+
+    <p>
+      「句点派」（<code>U+FF0E</code>）は陳子晴（族名には·を用い、個人名刺には一律「陳子晴文化班」と印刷）を代表とする。彼女は国際言語学学会の〔第二十三回年報〕を取り出した。表紙の見出しはGB式の彎引号で印刷されている：“‘点’の政治⸺終わりなき美学論争”——彼女は、見出しを見ただけで勝ったと述べる。彼女の主張は：「句点を名前の中央に置き、間隔号を文字の脇に寄せる、そのずれた感覚こそ美しい——意味が正しければ正しいと、誰が決めた？」
+
+    <p><code>U+FF0E</code>は全角句点であり、意味的には間隔号ではない；「句点派」もこの点は認め、こう述べる：「我々は知っている。それこそが要点なのだ。」
+
+    <p>委員会はこれまで二十七回の会議を開催し、議事録三百十七頁を産出した：前三頁はコーパスを議論し；後三百十四頁はこの点を議論した。
+
+    <p>次長リン·スーフェンは宣言する：「本委員会は決して多数決で少数を抑圧することはしない！」現場の拍手は熱烈であった；コーパスは依然として空である。
+
+    <p>これについて、ムナ·リガオの態度は一貫して簡潔である：『この点は、私自身が決める。』通訳員は事後、彼の族語原文の大意をこう伝えた：<span lang="en">‘This dot is mine,’ he said,
+        “not…yours.”</span>
+
+    <p>コーパス管理画面のパス形式は「族語庫／タイヤル語＼音声」のようになっており、コーパス登録率は……九十四·七％．⸺待機中——……
+
+    <p>現在三つの草案が存在する：〔草案一〕は·を採用；〔草案二〕は・を採用；〔草案三〕は．を採用し、付属の四十頁《句読点民主化：全角句点を間隔号として用いる哲学的基礎》とともに、同じく審議中である。
+
+    <p>原住民委員会の発表によれば、計画は今月－来月中に選考を完了し、再スケジュール化する予定である。計画は予定通り完了できるか？各界は息を呑んで注視している。
+  </article>
+
+  <!-- ===== Simplified Chinese (zh-Hans) — character conversion only, vocabulary preserved ===== -->
+  <article id="zh-Hans" data-lang="zh-Hans" lang="zh-Hans">
+    <h1>
+      <span>【文化科技融合】</span>
+      间隔号标准之争　三派僵持不下<br />
+      计划语料已完成九十四·七％　委员会：尚在审议
+    </h1>
+
+    <p>【本报文化特派员　吴佳蓉　专电】《原住民族数位语言保存计划》昨日迈入停摆第四年。语料搜集、整理、标注工作进度达九十四·七％，技术面、人员均无问题；唯一悬而未决的，是一个点：人名间隔号，到底用哪个字元？
+
+    <h2>委员会内部分裂为三派</h2>
+    <p>「·派」（<code>U+00B7</code>）以耆老武那·礼告为精神领袖。<em>「我们祖先就是这样写的，这个点才是我们的点。」</em>
+
+    <p>
+      「・派」（<code>U+30FB</code>）由计划主持人汉那・伍茂博士—现任三派调解人，成效如前述—领衔。汉那博士指出，<code>U+30FB</code>已获《全球语言标准公约》〈附件七〉采认，字形端正，理应统一。
+
+    <p>
+      「句号派」（<code>U+FF0E</code>）以陈子晴（族名使用·，个人名片一律印作「陈子晴文化组」）为代表。她翻出一份国际语言学学会〔廿三届年报〕，封面标题以GB式弯引号排印：“‘点’的政治⸺一场永无止境的美学辩论”——她表示，光看标题就赢了。她的主张是：「句号放在名字中间，点偏在字旁，那种错位感才有美感——谁说语意对了才叫对？」
+
+    <p><code>U+FF0E</code>为全形句号，语意上并非间隔号；「句号派」亦承认此点，并表示：「我们知道，这才是重点。」
+
+    <p>委员会迄今召开二十七次会议，产出纪录三百一十七页：前三页讨论语料；后三百一十四页讨论这个点。
+
+    <p>次长林淑芬宣示：「本委员会绝不以多数决强行压制少数！」现场掌声热烈；语料库仍为空。
+
+    <p>对此，武那·礼告态度一贯简短：『这个点，我自己决定。』翻译员事后转述其族语原话大意：<span lang="en">‘This dot is mine,’ he said, “not…yours.”</span>
+
+    <p>语料库后台路径格式如「族语库／泰雅语＼音档」，语料存入率……九十四·七％．⸺待命中——……
+
+    <p>目前存有三份草案：〔草案一〕采·；〔草案二〕采・；〔草案三〕采．，并附四十页《标点民主化：以全形句号作间隔号之哲学基础》，同样在审议中。
+
+    <p>原委会表示，计划将于本月－次月完成评选并重新排期。计划能否如期完成？各界均拭目以待。
+  </article>
+
+  <!-- ===== Korean (ko) — Hanja-Hangul mixed style ===== -->
+  <article id="ko" data-lang="ko" lang="ko">
+    <h1>
+      <span>【文化科技融合】</span>
+      間隔號 標準 之 爭　三派 僵持不下<br />
+      計劃 語料 進度 九十四·七％ 達成　委員會：審議 中
+    </h1>
+
+    <p>【本紙 文化特派員　吳佳蓉　專電】《原住民族 디지털 言語 保存計劃》이 어제 停擺 第四年에 進入했다。語料 蒐集、整理、標注 作業 進度는 九十四·七％에 達하였고、技術面과 人員 모두 問題가 없다；唯一 懸案은、한
+      個 點이다：人名 間隔號로 도대체 어떤 文字를 사용해야 하는가？
+
+    <h2>委員會 內部는 三派로 分裂</h2>
+    <p>「·派」（<code>U+00B7</code>）는 耆老 武那·禮告를 精神的 領袖로 한다。<em>「우리 祖上은 이렇게 적었다。이 點이야말로 우리의 點이다。」</em>
+
+    <p>「・派」（<code>U+30FB</code>）는 計劃 主宰者 漢那・伍茂 博士―現任 三派 調解人、成效는 前述한 바와 같다―가 領銜한다。漢那 博士는、<code>U+30FB</code>가 이미《世界 言語
+      標準 條約》〈附則 第七〉에 採用되었고、字形이 端正하여 마땅히 統一되어야 한다고 指摘한다。
+
+    <p>「句點派」（<code>U+FF0E</code>）는 陳子晴（族名에는·使用、個人 名刺에는 一律「陳子晴 文化組」으로 印刷）을 代表로 한다。그녀는 國際 言語學 學會의〔第二十三屆 年報〕를 펼쳐 들었다。表紙
+      標題는 GB式 彎引號로 印刷되어 있다：“‘點’의 政治⸺끝없는 美學 論爭”——그녀는 標題만 봐도 이미 이겼다고 말한다。그녀의 主張은：「句點을 이름 한가운데에 두고、間隔號를 글자 옆에 두는、그
+      어긋남이야말로 美感이다——意味가 맞아야만 맞다고 누가 定했는가？」
+
+    <p><code>U+FF0E</code>는 全形 句點이며、意味上으로는 間隔號가 아니다；「句點派」 또한 이를 認定하고、이렇게 말한다：「우리는 안다。그것이야말로 重點이다。」
+
+    <p>委員會는 至今까지 二十七 回 會議를 召集하고、紀錄 三百十七 頁을 産出했다：前 三頁은 語料를 論議하고；後 三百十四頁은 이 點을 論議했다。
+
+    <p>次長 林淑芬은 宣言한다：「本 委員會는 결코 多數決로 少數를 强行 壓制하지 않는다！」現場의 拍手는 熱烈했다；語料庫는 如前히 空이다。
+
+    <p>이에 對해、武那·禮告의 態度는 一貫되게 簡短하다：『이 點은、내가 스스로 決定한다。』通譯員이 事後 그의 族語 原文 大意를 傳했다：<span lang="en">‘This dot is mine,’ he
+        said, “not…yours.”</span>
+
+    <p>語料庫 後臺 經路 形式은「族語庫／泰雅語＼音檔」과 같고、語料 登錄率은……九十四·七％．⸺待機 中——……
+
+    <p>現在 三 個 草案이 있다：〔草案一〕은·採用；〔草案二〕는・採用；〔草案三〕은．採用이며、附 四十頁《標點 民主化：全形 句點을 間隔號로 사용함의 哲學的 基礎》와 함께、同樣 審議 中이다。
+
+    <p>原住民 委員會는、計劃이 이번 달－다음 달 內에 評選을 完了하고 다시 排期될 豫定이라고 發表했다。計劃이 期日 內에 完了될 수 있을까？各界는 모두 拭目하며 기다리고 있다。
+  </article>
+</body>
+
+</html>

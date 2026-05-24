@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diantenjeom KV — Korean Vertical demo</title>
+  <link rel="stylesheet" href="dist/diantenjeom.css">
+
+  <style>
+    :root {
+      --sans: 'Diantenjeom Sans KV', 'Apple SD Gothic Neo', 'Nanum Gothic', sans-serif;
+      --serif: 'Diantenjeom Serif KV', 'AppleMyungjo', 'Nanum Myeongjo', serif;
+      --hangul-fallback: 'Apple SD Gothic Neo', 'Nanum Gothic';
+
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.85;
+      box-sizing: border-box;
+      padding-block: 4rem 8rem;
+    }
+    *, *::before, *::after { box-sizing: inherit; }
+    body { margin: 0; }
+
+    body > header {
+      position: fixed; inset: 0 auto auto 0;
+      display: flex; align-items: center; justify-content: center;
+      gap: 2rem;
+      padding-inline: 2rem;
+      block-size: 3rem; inline-size: 100%;
+      line-height: 1;
+      background: #f3f3f3;
+      border-block-end: 1px solid #ccc;
+      z-index: 10;
+    }
+    header label { display: flex; align-items: center; gap: .5em; }
+
+    main { max-inline-size: 60em; margin-inline: auto; padding-inline: 1em; }
+
+    article {
+      font-weight: 300;
+      text-align: justify;
+      padding-block-start: 2em;
+    }
+    h1 { font-size: 1.6em; font-weight: bolder; margin-block: 0 .8em; }
+    h1 small { display: block; font-size: .6em; font-weight: 300; color: #666; }
+    h2 { font-size: 1em; font-weight: bolder; margin-block: 1.5em .35em; }
+    p { margin: 0; text-indent: 1em; }
+    p:first-of-type { text-indent: 0; }
+
+    /* Toggles */
+    header:has(input[name="vertical"]:checked) ~ main article {
+      writing-mode: vertical-rl;
+      block-size: 28em;
+      inline-size: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    header:has(input[name="serif"]:checked) ~ main article {
+      font-family: var(--serif);
+    }
+    header:has(input[name="dim-hangul"]:checked) ~ main article :is(
+      :not(:lang(en)):not(:lang(zh-Hant)):not(:lang(zh-Hans))
+    ) {
+      /* visual cue: tint everything that's the document's lang (ko)
+         a bit lighter so Hanja-mixed prose visually separates */
+    }
+
+    /* Hanja highlight — wraps hanja runs to demo mixed-script texture */
+    .han { color: #444; font-weight: 400; }
+
+    .source {
+      font-size: .8em;
+      color: #888;
+      margin-block-start: 2em;
+      text-indent: 0;
+    }
+  </style>
+
+  <script type="module">
+    const $weightInput = document.querySelector('input[name=weight]');
+    const $weightOutput = document.querySelector('output[name=weight]');
+    const $articles = document.querySelectorAll('article');
+    $weightInput.addEventListener('input', () => {
+      $weightOutput.textContent = $weightInput.value;
+      for (const $a of $articles) $a.style.fontWeight = $weightInput.value;
+    });
+  </script>
+</head>
+
+<body>
+  <header>
+    <label><input type="checkbox" name="vertical" checked> 세로쓰기</label>
+    <label><input type="checkbox" name="serif"> 명조체 (Serif)</label>
+    <label>
+      굵기
+      <output name="weight">300</output>
+      <input type="range" name="weight" min="100" max="900" step="10" value="300">
+    </label>
+  </header>
+
+  <main>
+    <article>
+      <h1>
+        訓民正音 御製序文
+        <small>世宗大王 御製 · 1446年</small>
+      </h1>
+
+      <p>
+        <span class="han">國</span>之
+        <span class="han">語</span>로
+        <span class="han">中</span>國과
+        달라、
+        <span class="han">文字</span>와 서로
+        <span class="han">通</span>하지 아니하니、
+        이런
+        <span class="han">故</span>로
+        어리석은
+        <span class="han">百姓</span>이
+        말하고자 하는 바가 있어도
+        마침내 제 뜻을 펴지 못하는 이가
+        많으니라。
+      </p>
+
+      <p>
+        내 이를
+        <span class="han">爲</span>하여
+        가엾이 여겨
+        새로
+        <span class="han">스물여덟 字</span>를 만드노니、
+        사람마다 하여금
+        쉽게 익혀
+        날로
+        쓰임에
+        <span class="han">便安</span>케 하고자 할
+        따름이니라。
+      </p>
+
+      <p class="source">
+        — 訓民正音 御製序文〔1446〕，現代
+        <span class="han">한자혼용</span> 본
+      </p>
+    </article>
+
+    <article>
+      <h1>
+        無情 第一章 발췌
+        <small>李光洙 · 1917年</small>
+      </h1>
+
+      <p>
+        <span class="han">京城學校 英語敎師 李亨植</span>은
+        <span class="han">午後 두 시 四限</span> 講義를 마치고
+        <span class="han">本舍</span>로 돌아와
+        <span class="han">改服</span>할 새、
+        <span class="han">學校 給仕</span>가
+        <span class="han">封套</span> 한
+        <span class="han">張</span>을 내어들고
+        들어와、
+        「<span class="han">先生</span>님、
+        <span class="han">손님</span>이 오셨습니다。」
+      </p>
+
+      <p>
+        「<span class="han">손님</span>？
+        누구라더냐？」
+      </p>
+
+      <p>
+        「<span class="han">某 女學校 校監</span>이라 하옵니다。」
+      </p>
+
+      <p>
+        <span class="han">亨植</span>은
+        <span class="han">封套</span>를 받아 들고
+        펼쳐 보매、
+        <span class="han">數行 漢字</span>로
+        쓰인
+        <span class="han">名刺</span>러라！
+        그
+        <span class="han">名刺</span>를
+        살펴보니
+        『<span class="han">京城 第一 女學校 校監 金長老</span>』라
+        하였더라。
+      </p>
+
+      <p>
+        “이게 무슨 일이람⋯”
+        <span class="han">亨植</span>은
+        혼잣말로
+        중얼거리며、
+        가만히
+        <span class="han">封套</span>를
+        쥐어 보았다。
+      </p>
+
+      <p class="source">
+        —
+        <span class="han">李光洙</span>《無情》
+        〔1917、<span class="han">每日申報 連載</span>〕
+        ，
+        <span class="han">本</span>
+        텍스트는
+        <span class="han">原典</span>의
+        <span class="han">漢字混用</span>
+        <span class="han">體</span>를
+        간략히
+        <span class="han">再現</span>한
+        것임。
+      </p>
+    </article>
+
+    <article>
+      <h1>
+        標點 試驗 段落
+        <small>句讀點・引用符・破折號・連續標點 등 시각 확인</small>
+      </h1>
+
+      <p>
+        그는
+        <span class="han">韓國語 直書</span>에 대해
+        「조용히」 말하였다。
+        『이것이 우리의
+        <span class="han">傳統</span>이다。』
+        그러나
+        <span class="han">現代</span>에
+        와서는⋯⋯
+        과연 그러한가？
+      </p>
+
+      <p>
+        <span class="han">時期</span>：
+        <span class="han">1446</span>년 ―
+        <span class="han">현재</span>。
+        <span class="han">分量</span>；
+        <span class="han">短文</span>。
+        <span class="han">參考</span>：
+        《訓民正音》〈解例〉、
+        《無情》〔復刻版〕、
+        《韓國語文 規範集》。
+      </p>
+
+      <p>
+        〜
+        <span class="han">物結符</span>도
+        直排에서 어떻게 보이는지？
+        <span class="han">中點</span>은
+        <span class="han">姓·名</span>
+        사이에 자주 쓰이며、
+        <span class="han">著重</span>은
+        ●를 사용한다。
+      </p>
+
+      <p class="source">
+        — 직접 작성、자유 사용。
+      </p>
+    </article>
+  </main>
+</body>
+</html>

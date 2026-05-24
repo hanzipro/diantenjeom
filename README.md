@@ -79,6 +79,25 @@ change. More docs and examples to come.
     `Blink>Fonts>Shaping`.
 
 
+- **MOE pair-squeeze drops `(Close, Open)` under `lang="ja"`.** Specifically
+  `。「` doesn't squeeze under `lang="ja"`, but the same pair squeezes
+  under `lang="zh-Hant" / "zh-Hans" / "ko"`. `。『` (Close + double-angle
+  open) squeezes under all four langs. Verified:
+  - MOE font is 100 % lang-independent on the font side: GSUB output is
+    bit-identical across langs (uharfbuzz confirms), GPOS halt/vhal/palt/
+    vpal coverage is symmetric between `「` (U+300C) and `『` (U+300E),
+    and `hani` script has only a single `default` LangSys in GPOS.
+  - Chrome confirms `「` uses `Diantenjeom Sans MOE` (not Hiragino) under
+    `lang="ja"` — so it's not a font fallback issue.
+  - Pinning `locl` to ZHT (via `pin_locl_to="ZHT"` on MOE variants) made
+    pair-squeeze fire under non-zh-Hant langs in general, but this one
+    specific `(kClose, kOpen)` pair still misses under `ja`.
+  - Conclusion: a Chromium `text-spacing-trim` heuristic that classifies
+    `「` differently under `ja` from how it classifies `『`. Workaround:
+    explicit `font-feature-settings: 'halt', 'vhal'` to bypass the auto-
+    fire gate (over-compresses other pairs). To file as a Chromium bug —
+    needs minimal repro.
+
 - **Collapse per-style files into one shared subset.** The Noto CJK source
   carries `locl` GSUB rules that map the same Unicode punctuation to different
   glyph forms per OT language tag (JAN / ZHT / ZHS / KOR), so a single subset

@@ -8,14 +8,48 @@
   <link rel="stylesheet" href="main.css">
 
   <script type="module">
+    // localStorage-backed preferences shared with new-article.html
+    // (same STORAGE_KEY). Pages with fewer controls just ignore the
+    // extra entries — restorePrefs walks `input[name=...]` and any
+    // unknown names produce empty NodeLists.
+    const STORAGE_KEY = 'diantenjeom-prefs'
+
+    function restorePrefs() {
+      let saved = {}
+      try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch {}
+      for (const [name, value] of Object.entries(saved)) {
+        for (const $el of document.querySelectorAll(`input[name="${name}"]`)) {
+          if ($el.type === 'checkbox') $el.checked = (value === true)
+          else if ($el.type === 'radio') $el.checked = ($el.value === value)
+          else if ($el.type === 'range') $el.value = value
+        }
+      }
+    }
+
+    function savePrefs() {
+      const prefs = {}
+      for (const $el of document.querySelectorAll('input[name]')) {
+        if ($el.type === 'checkbox') prefs[$el.name] = $el.checked
+        else if ($el.type === 'radio' && $el.checked) prefs[$el.name] = $el.value
+        else if ($el.type === 'range') prefs[$el.name] = $el.value
+      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)) } catch {}
+    }
+
     const $weightInput = document.querySelector('input[name=weight]')
     const $weightOutput = document.querySelector('output[name=weight]')
     const $articles = document.querySelectorAll('article')
 
-    $weightInput.addEventListener('input', () => {
+    function applyWeight() {
       $weightOutput.textContent = $weightInput.value
       for (const $a of $articles) $a.style.fontWeight = $weightInput.value
-    })
+    }
+
+    restorePrefs()
+    applyWeight()
+
+    $weightInput.addEventListener('input', () => { applyWeight(); savePrefs() })
+    document.body.addEventListener('change', savePrefs)
   </script>
 </head>
 <body>
@@ -51,7 +85,7 @@
     <p>【本報文化特派員　吳佳蓉　專電】《原住民族數位語言保存計畫》昨日邁入停擺第四年。語料蒐集、整理、標注工作進度達九十四·七％，技術面、人員均無問題；唯一懸而未決的，是一個點：人名間隔號，到底用哪個字元？
 
     <h2>委員會內部分裂為三派</h2>
-    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「我們祖先就是這樣寫的，這個點才是我們的點。」
+    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「<em>我們祖先就是這樣寫的，這個點才是我們的點。</em>」
 
     <p>「・派」（<code>U+30FB</code>）由計畫主持人漢那・伍茂博士—現任三派調解人，成效如前述—領銜。漢那博士指出，<code>U+30FB</code>已獲《全球語言標準公約》〈附件七〉採認，字形端正，理應統一。
 
@@ -81,7 +115,7 @@
     <p>【本報文化特派員　吳佳蓉　專電】《原住民族數位語言保存計畫》昨日邁入停擺第四年。語料蒐集、整理、標注工作進度達九十四·七％，技術面、人員均無問題；唯一懸而未決的，是一個點：人名間隔號，到底用哪個字元？
 
     <h2>委員會內部分裂為三派</h2>
-    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「我們祖先就是這樣寫的，這個點才是我們的點。」
+    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「<em>我們祖先就是這樣寫的，這個點才是我們的點。</em>」
 
     <p>「・派」（<code>U+30FB</code>）由計畫主持人漢那・伍茂博士—現任三派調解人，成效如前述—領銜。漢那博士指出，<code>U+30FB</code>已獲《全球語言標準公約》〈附件七〉採認，字形端正，理應統一。
 
@@ -111,7 +145,7 @@
     <p>【本報文化特派員　吳佳蓉　專電】《原住民族數位語言保存計畫》昨日邁入停擺第四年。語料蒐集、整理、標注工作進度達九十四·七％，技術面、人員均無問題；唯一懸而未決的，是一個點：人名間隔號，到底用哪個字元？
 
     <h2>委員會內部分裂為三派</h2>
-    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「我們祖先就是這樣寫的，這個點才是我們的點。」
+    <p>「·派」（<code>U+00B7</code>）以耆老武那·禮告為精神領袖。「<em>我們祖先就是這樣寫的，這個點才是我們的點。</em>」
 
     <p>「・派」（<code>U+30FB</code>）由計畫主持人漢那・伍茂博士—現任三派調解人，成效如前述—領銜。漢那博士指出，<code>U+30FB</code>已獲《全球語言標準公約》〈附件七〉採認，字形端正，理應統一。
 
