@@ -24,6 +24,14 @@ from __future__ import annotations
 
 # BASE — shared codepoint set across all variants.
 BASE: list[int] = [
+    # U+0020 SPACE — required by WebKit for `text-emphasis` skip handling.
+    # When the base char is punctuation, WebKit replaces the emphasis
+    # glyph with `spaceGlyph()` (the font's U+0020), which on a font
+    # missing U+0020 falls through to `.notdef` and renders as boxed-X
+    # tofu next to every punct in vertical CJK. Including U+0020 fixes
+    # this without affecting anything else — the source's space outline
+    # is empty, just an advance width.
+    0x0020,                  # SPACE
     0x3002,                  # 句號 。
     0xFF0E,                  # 單點全形句號 ．
     0xFF0C,                  # 逗號 ，

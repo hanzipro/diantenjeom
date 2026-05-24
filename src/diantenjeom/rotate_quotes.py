@@ -219,6 +219,7 @@ def _attach_vert_lookup(font: TTFont, mapping: dict[str, str]) -> None:
 def install(
     font: TTFont,
     configs: dict[int, RotateConfig] = ROTATE_CONFIGS,
+    clear_locl_for_cps: tuple[int, ...] = (),
 ) -> dict[str, str]:
     """Bake pre-rotated alternates + `vert`/`vrt2` substitutions for each
     codepoint in `configs`. Returns the {src: rotated} glyph mapping
@@ -227,9 +228,26 @@ def install(
     Skips codepoints whose source glyph already has an existing `vert`
     substitution — overriding those would fight the font's designed
     vertical alternates (e.g. ellipsis already has one).
+
+    `clear_locl_for_cps` removes any existing `locl` SingleSubst entry
+    keyed on a codepoint's cmap glyph BEFORE installing the vert sub.
+    Needed for MOE: `pin_locl_to="ZHT"` brings in Source Han JP's ZHT
+    locl, which substitutes the curly quotes to slightly-lifted alternates
+    that (a) shift horizontal y by +100 vs JIS and (b) break the kern
+    table's PairPos coverage (kern is keyed on the cmap glyph, not the
+    locl output) — so MOE horizontal quotes lose the negative kern that
+    pulls them tight against neighbours, opening visible gaps absent in
+    JIS. Clearing the locl entry restores both behaviours.
+
+    Also extends the vert sub to cover the post-`locl` glyph for each
+    src as a defensive fallback for variants that don't clear locl but
+    still want the rotated vertical form.
     """
     cmap = font.getBestCmap()
+    if clear_locl_for_cps:
+        _clear_locl_subs(font, set(clear_locl_for_cps))
     existing_vert = _vert_substitution_sources(font)
+    locl_outputs = _locl_outputs(font)
     mapping: dict[str, str] = {}
     for cp, cfg in configs.items():
         src = cmap.get(cp)
@@ -238,10 +256,62 @@ def install(
         rotated = f"{src}.rot90"
         _add_rotated_glyph(font, src, rotated, cfg)
         mapping[src] = rotated
+        locl_dst = locl_outputs.get(src)
+        if locl_dst and locl_dst != src and locl_dst not in existing_vert:
+            mapping[locl_dst] = rotated
 
     if mapping:
         _attach_vert_lookup(font, mapping)
     return mapping
+
+
+def _clear_locl_subs(font: TTFont, codepoints: set[int]) -> None:
+    """Remove SingleSubst entries from every `locl` lookup whose source
+    glyph is a cmap entry for any codepoint in `codepoints`. Leaves the
+    lookup in place (other entries untouched) — only the targeted keys
+    are dropped. Drills into `ExtensionSubst` wrappers, which Source Han
+    uses for the bulk of its locl lookups."""
+    cmap = font.getBestCmap()
+    targets = {cmap[cp] for cp in codepoints if cp in cmap}
+    if not targets or "GSUB" not in font:
+        return
+    gsub = font["GSUB"].table
+    lookup_to_feats: dict[int, set[str]] = {}
+    for fr in gsub.FeatureList.FeatureRecord:
+        for li in fr.Feature.LookupListIndex:
+            lookup_to_feats.setdefault(li, set()).add(fr.FeatureTag)
+    for li_idx, lookup in enumerate(gsub.LookupList.Lookup):
+        if "locl" not in lookup_to_feats.get(li_idx, set()):
+            continue
+        for st in lookup.SubTable:
+            inner = getattr(st, "ExtSubTable", st)
+            if not hasattr(inner, "mapping"):
+                continue
+            for g in list(inner.mapping):
+                if g in targets:
+                    del inner.mapping[g]
+
+
+def _locl_outputs(font: TTFont) -> dict[str, str]:
+    """Return {src_glyph: locl_substituted_glyph} for every SingleSubst
+    in any `locl` lookup. Used to keep the vert rotation alive after a
+    locl swap (see install)."""
+    out: dict[str, str] = {}
+    if "GSUB" not in font:
+        return out
+    gsub = font["GSUB"].table
+    lookup_to_feats: dict[int, set[str]] = {}
+    for fr in gsub.FeatureList.FeatureRecord:
+        for li in fr.Feature.LookupListIndex:
+            lookup_to_feats.setdefault(li, set()).add(fr.FeatureTag)
+    for li_idx, lookup in enumerate(gsub.LookupList.Lookup):
+        if "locl" not in lookup_to_feats.get(li_idx, set()):
+            continue
+        for st in lookup.SubTable:
+            inner = getattr(st, "ExtSubTable", st)
+            if hasattr(inner, "mapping"):
+                out.update(inner.mapping)
+    return out
 
 
 def _vert_substitution_sources(font: TTFont) -> set[str]:

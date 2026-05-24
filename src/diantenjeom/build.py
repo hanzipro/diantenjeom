@@ -102,6 +102,13 @@ class Variant:
     rotate_configs: dict[int, rotate_quotes.RotateConfig] = field(
         default_factory=lambda: dict(rotate_quotes.ROTATE_CONFIGS)
     )
+    # Codepoints whose Source Han `locl` SingleSubst should be cleared
+    # BEFORE rotate_quotes installs its vert sub. Used by MOE: `pin_locl_to=
+    # "ZHT"` brings in a locl that lifts the curly quotes +100u (visible
+    # y offset in horizontal) AND breaks the kern table's PairPos coverage
+    # — both diverge from JIS. Clearing the locl entries makes MOE quotes
+    # render identically to JIS in both writing modes.
+    rotate_clear_locl_cps: tuple[int, ...] = ()
     # Per-codepoint vertical-mode y nudges for vert-substituted glyphs.
     # Different punctuation styles position 、，等 differently — pass the
     # right dict. Empty dict means "use source positions as-is".
@@ -365,7 +372,10 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # rotate_quotes' "skip codepoints with existing vert sub" check
     # picks them up and doesn't bake a rotated alternate on top.
     vert_subst.install(font, variant.vert_substitutions)
-    rotate_quotes.install(font, variant.rotate_configs)
+    rotate_quotes.install(
+        font, variant.rotate_configs,
+        clear_locl_for_cps=variant.rotate_clear_locl_cps,
+    )
     vert_nudge.install(font, variant.vert_nudges)
     dash_center.install(font)
     ellipsis_pair.install(font)
@@ -540,6 +550,7 @@ def main() -> None:
             # tripping Chrome's han_kerning four-dot consistency gate.
             css_delegate_donor_stem="diantenjeom-sans-jis",
             css_delegate_cps=(0xFF0E,),
+            rotate_clear_locl_cps=(0x2018, 0x2019, 0x201C, 0x201D),
         ),
         Variant(
             punct="moe",
@@ -560,6 +571,7 @@ def main() -> None:
             ),
             css_delegate_donor_stem="diantenjeom-serif-jis",
             css_delegate_cps=(0xFF0E,),
+            rotate_clear_locl_cps=(0x2018, 0x2019, 0x201C, 0x201D),
         ),
         # SC (mainland GB) — three locale-specific behaviours layered on JP
         # base:
