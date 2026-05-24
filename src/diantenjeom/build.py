@@ -49,6 +49,7 @@ from diantenjeom import (
     ellipsis_pair,
     gpos_graft,
     graft,
+    middle_dot,
     pin_locale,
     rotate_quotes,
     vert_nudge,
@@ -372,6 +373,12 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # Chrome/Safari ~10% cross-axis right offset on these glyphs (see
     # README TODO / docs/vertical-text.md).
     center_punct.install(font, variant.center_punct_cps)
+
+    # Unify U+00B7 (Latin `·`) with U+30FB (katakana `・`) by re-routing
+    # the Latin codepoint's cmap entry to the katakana glyph. Both then
+    # render as the same full-width CJK middle dot across all 4 variants
+    # and all document langs. See middle_dot.py for the trade-off.
+    middle_dot.install(font)
 
     # Hand-drawn U+25CF for CSS `text-emphasis: circle`. Replaces
     # Noto's oversize disc (~0.85 em) with a tasteful 0.50 em circle
