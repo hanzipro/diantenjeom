@@ -43,6 +43,7 @@ INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
 
 from diantenjeom import (
     center_punct,
+    circle,
     codepoints,
     dash_center,
     ellipsis_pair,
@@ -371,6 +372,14 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     # Chrome/Safari ~10% cross-axis right offset on these glyphs (see
     # README TODO / docs/vertical-text.md).
     center_punct.install(font, variant.center_punct_cps)
+
+    # Hand-drawn U+25CF for CSS `text-emphasis: circle`. Replaces
+    # Noto's oversize disc (~0.85 em) with a tasteful 0.50 em circle
+    # positioned slightly above em centre. No-op if the variant's
+    # codepoint set excludes U+25CF (won't happen with current BASE,
+    # but the guard keeps the call cheap and safe).
+    if 0x25CF in variant.unicodes:
+        circle.install(font)
 
     # Recompute OS/2 Unicode Range bits from the final cmap. The subsetter
     # leaves stale bits behind — bit 31 (General Punctuation, where U+2026

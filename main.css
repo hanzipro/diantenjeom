@@ -102,4 +102,10 @@ article {
     --sans: 'Binomoto Sans', 'Hiragino Sans', 'Hiragino Sans GB', 'Hiragino Sans CNS', sans-serif;
     --serif: 'Binomoto Serif', 'Hiragino Mincho ProN', 'Songti SC', 'Songti TC', serif;
   }
+
+  em {
+    text-emphasis: filled circle;
+    -webkit-text-emphasis: filled circle;
+    font-style: inherit;
+  }
 }
