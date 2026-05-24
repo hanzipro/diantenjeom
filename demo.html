@@ -127,6 +127,47 @@
   </div>
 </div>
 
+<h2>開括號 contextual 擠壓驗證</h2>
+<p style="color:#666;font-size:.9rem">
+  開括號（「『（〔【〈《〖［｛）只有在「前面是 CJK 字 / 標點」時應該擠壓。
+  「前面是英文 / 行首」應該維持全寬。靠 source han 的 vhal GPOS 條目 +
+  Chrome 的 <code>text-spacing-trim</code> 觸發。
+</p>
+<div class="v-wrap">
+  <div class="v-col">
+    <h2>diantenjeom</h2>
+    中「字」續寫<br>
+    abc「foo」xyz<br>
+    「字」起頭<br>
+    曰：「天行健」<br>
+    語；「君子」<br>
+    嗚呼！「驚」<br>
+    然乎？「疑」<br>
+    例：『書名』<br>
+    註：（補）<br>
+    引：〔甲〕<br>
+    題：【要】<br>
+    類：〈分〉<br>
+    集：《名》
+  </div>
+  <div class="v-col bare">
+    <h2>system</h2>
+    中「字」續寫<br>
+    abc「foo」xyz<br>
+    「字」起頭<br>
+    曰：「天行健」<br>
+    語；「君子」<br>
+    嗚呼！「驚」<br>
+    然乎？「疑」<br>
+    例：『書名』<br>
+    註：（補）<br>
+    引：〔甲〕<br>
+    題：【要】<br>
+    類：〈分〉<br>
+    集：《名》
+  </div>
+</div>
+
 <hr>
 
 <h1>4. 變數軸 — <code>font-weight</code> 100–900</h1>
