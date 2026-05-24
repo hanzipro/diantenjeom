@@ -572,7 +572,7 @@ def main() -> None:
             punct="gb",
             style="sans",
             source=args.sources / "NotoSansCJKjp-VF.otf",
-            unicodes=codepoints.SC,
+            unicodes=codepoints.GB,
             # FE15 / FE16 (the vert presentation forms for ！？) sit too tight
             # to the top in SC vertical layout; nudge down 5 % of em. ：；
             # (FE13 / FE14) stay at source position.
@@ -605,7 +605,7 @@ def main() -> None:
             punct="gb",
             style="serif",
             source=args.sources / "NotoSerifCJKjp-VF.otf",
-            unicodes=codepoints.SC,
+            unicodes=codepoints.GB,
             vert_nudges={**vert_nudge.JP_SERIF, 0xFF01: -50, 0xFF1F: -50},
             pin_to_locale="ZHS",
             pin_locl_to="ZHS",
@@ -625,6 +625,32 @@ def main() -> None:
             },
             gpos_squeeze_cps=(0x2018, 0x2019, 0x201C, 0x201D),
             center_punct_cps=(),
+        ),
+
+        # KV (Korean Vertical) — JP-based glyph design with `：` upright
+        # so vertical Korean reads naturally. No standardised regional
+        # punctuation standard exists for Korean (한글맞춤법 dropped the
+        # vertical chapter in 2015; W3C KLReq is a draft) — the "KV"
+        # name is descriptive rather than an authority reference.
+        # Horizontal Korean works fine with system Western punctuation,
+        # so KV is intended for vertical contexts (signage, calligraphy,
+        # mixed Hangul–Hanja prose, traditional layouts). See
+        # docs/notes/korean-vertical-punctuation.md.
+        Variant(
+            punct="kv",
+            style="sans",
+            source=args.sources / "NotoSansCJKjp-VF.otf",
+            unicodes=codepoints.BASE,
+            vert_nudges=vert_nudge.JP,
+            upright_cps=(0xFF1A,),  # ：直排不旋轉（韓文 KLReq cl7 慣例）
+        ),
+        Variant(
+            punct="kv",
+            style="serif",
+            source=args.sources / "NotoSerifCJKjp-VF.otf",
+            unicodes=codepoints.BASE,
+            vert_nudges=vert_nudge.JP_SERIF,
+            upright_cps=(0xFF1A,),
         ),
     ]
 
