@@ -1,17 +1,29 @@
-"""Punctuation codepoint sets per locale.
+"""Punctuation codepoint sets per variant.
 
-The lists mirror the punctuation tables in the repo's HTML demos
-(`ja.html`, `index.html`); keep them in sync when the demos change.
+The constants here mirror the punctuation tables in the repo's HTML demos
+(`ja.html`, `index.html`, `ko.html`) — keep them in sync when the demos
+change.
 
-Each entry is annotated with the row's 標點 name so a diff against the
-demo table reads naturally. Don't fold characters together — the
-demo is the source of truth and we want one line per cell.
+Each entry is annotated with its 標點 name so a diff against the demos
+reads naturally. Don't fold characters together — the demos are the
+source of truth and we want one line per cell.
+
+Variant constants:
+
+  BASE  Shared full set covering every CJK punctuation codepoint each
+        Diantenjeom variant carries. JIS / MOE / KV all use `BASE` as-is;
+        GB adds vertical-presentation-form brackets on top.
+  GB    `BASE` plus U+FE41-FE44 corner-bracket vertical presentation
+        forms required by the GB variant's curly-quote → corner-bracket
+        vert substitution (Noto SC default ZHS routing).
+
+`JP` is kept as a back-compat alias for `BASE`.
 """
 
 from __future__ import annotations
 
-# ja.html — Japanese (Noto Sans JP). Order matches the table top-to-bottom.
-JP: list[int] = [
+# BASE — shared codepoint set across all variants.
+BASE: list[int] = [
     0x3002,                  # 句號 。
     0xFF0E,                  # 單點全形句號 ．
     0xFF0C,                  # 逗號 ，
@@ -42,14 +54,24 @@ JP: list[int] = [
     0x2026,                  # 刪節號 …
     0xFF0D,                  # 連接號 －
     0xFF0F, 0xFF3C,          # 斜線 ／＼
+    0x301C,                  # 波浪號 〜（韓文 물결표 / 日文 波ダッシュ）
+    0x25CF,                  # 著重號 ●（hand-drawn, for CSS text-emphasis: circle）
 ]
 
-# SC — JP set plus the four corner-bracket vertical presentation forms.
-# Required because the SC variant installs a vert/vrt2 substitution that
-# maps ‘’“” (U+2018/2019/201C/201D) to U+FE41/FE42/FE43/FE44 (per Noto SC's
-# default ZHS convention — Chinese vertical typesetting renders curly quotes
-# as 「」『』 corner brackets). The FE41-FE44 glyphs must be present in the
-# subset so the substitution targets resolve at render time.
-SC: list[int] = JP + [
+# Back-compat alias — older call sites used `codepoints.JP`. Kept so
+# external scripts / demos referencing this name keep working.
+JP: list[int] = BASE
+
+# GB — `BASE` plus the four corner-bracket vertical presentation forms.
+# Required because the GB variant installs a vert/vrt2 substitution that
+# maps ‘’“” (U+2018/2019/201C/201D) to U+FE41/FE42/FE43/FE44 (per Noto
+# SC's default ZHS convention — Chinese vertical typesetting renders
+# curly quotes as 「」『』 corner brackets). The FE41-FE44 glyphs must be
+# present in the subset so the substitution targets resolve at render
+# time.
+GB: list[int] = BASE + [
     0xFE41, 0xFE42, 0xFE43, 0xFE44,  # 直角引號直排 presentation forms
 ]
+
+# Back-compat alias.
+SC: list[int] = GB
