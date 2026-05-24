@@ -53,6 +53,7 @@ from diantenjeom import (
     pin_locale,
     rotate_quotes,
     vert_nudge,
+    vert_pair_squeeze,
     vert_subst,
 )
 
@@ -367,6 +368,12 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     vert_subst.install(font, variant.vert_substitutions)
     rotate_quotes.install(font, variant.rotate_configs)
     vert_nudge.install(font, variant.vert_nudges)
+    # Contextual vertical pair-squeeze: `：；！？` + open bracket → halve
+    # the bracket's vadv and lift its ink, via a GPOS chained-context lookup
+    # in `vkrn`. Universal across variants; only fires when both trigger and
+    # bracket are rendered from Diantenjeom (which is the normal case since
+    # both are punctuation).
+    vert_pair_squeeze.install(font)
     dash_center.install(font)
     ellipsis_pair.install(font)
     # Brute-force horizontal shift on ! : ; ? to compensate for the
