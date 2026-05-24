@@ -1,3 +1,6 @@
+# Claude
+.claude/settings.local.json
+
 # Python
 __pycache__/
 *.py[cod]
@@ -13,6 +16,8 @@ node_modules/
 
 # Built fonts — regenerated from sources, but shipped to NPM
 dist/
+demo/diantenjeom.css
+demo/fonts/
 
 # Upstream Noto CJK binaries — fetched via scripts/fetch_sources.py.
 # The lockfile (sources/sources.lock.json) is committed; the fonts are not.

@@ -40,7 +40,7 @@ body {
   align-items: flex-start;
   gap: 4rem;
   padding-block: 5rem 1rem;
-  padding-inline: 50vw;
+  padding-inline: 8rem;
   min-block-size: 100dvh;
 }
 
@@ -134,6 +134,7 @@ nav.lang-toc {
     block-size: calc(100dvh - 3rem);
     writing-mode: horizontal-tb;
     display: flex;
+    max-inline-size: 6rem;
     flex-direction: column;
     gap: .15em;
     padding: 1rem .75rem 1rem 1rem;
@@ -192,7 +193,7 @@ article {
       block-size: 7rem;
     }
 
-    span {
+    .category {
       display: block;
       font-weight: 200;
       font-size: .55em;

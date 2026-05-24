@@ -38,8 +38,9 @@
   ],
   "scripts": {
     "fetch:sources": "python scripts/fetch_sources.py",
-    "build": "python scripts/build_fonts.py",
-    "dev": "serve .",
+    "build": "python scripts/build_fonts.py && pnpm run sync:demo",
+    "sync:demo": "rm -rf demo/fonts demo/diantenjeom.css && cp dist/diantenjeom.css demo/ && cp -R dist/fonts demo/fonts",
+    "dev": "pnpm run sync:demo && serve -l 7001 demo",
     "prepublishOnly": "pnpm run build"
   },
   "publishConfig": {
