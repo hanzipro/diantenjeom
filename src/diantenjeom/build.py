@@ -518,6 +518,12 @@ def main() -> None:
             unicodes=codepoints.JP,
             vert_nudges={},
             upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
+            # Pin locl to ZHT so the TC-grafted design stays stable
+            # across document lang. Without this, lang="ja" swaps the
+            # four dots back to JP-corner (breaking trim's four-dot
+            # consistency check), and lang="zh-Hans" / "ko" substitutes
+            # ？！：； to SC corner-aligned presentation forms.
+            pin_locl_to="ZHT",
             layout_features=("*",),
             grafts=(
                 (args.sources / "NotoSansCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
@@ -535,6 +541,12 @@ def main() -> None:
             unicodes=codepoints.JP,
             vert_nudges={},
             upright_cps=(0xFF1A, 0x3001, 0xFF0C, 0x3002),
+            # Pin locl to ZHT so the TC-grafted design stays stable
+            # across document lang. Without this, lang="ja" swaps the
+            # four dots back to JP-corner (breaking trim's four-dot
+            # consistency check), and lang="zh-Hans" / "ko" substitutes
+            # ？！：； to SC corner-aligned presentation forms.
+            pin_locl_to="ZHT",
             layout_features=("*",),
             grafts=(
                 (args.sources / "NotoSerifCJKtc-VF.otf", (0x3001, 0xFF0C, 0x3002)),
