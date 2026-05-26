@@ -33,8 +33,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from fontTools.subset import Options, Subsetter
-from fontTools.ttLib import TTFont
+from fontTools.subset import Options, Subsetter  # noqa: E402
+from fontTools.ttLib import TTFont  # noqa: E402
 
 CODEPOINTS = [
     0x3001, 0x3002, 0xFF0C,

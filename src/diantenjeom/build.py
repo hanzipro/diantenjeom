@@ -23,6 +23,21 @@ from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables._f_v_a_r import NamedInstance
 
+from diantenjeom import (
+    center_punct,
+    circle,
+    codepoints,
+    dash_center,
+    ellipsis_pair,
+    gpos_graft,
+    graft,
+    middle_dot,
+    pin_locale,
+    rotate_quotes,
+    vert_nudge,
+    vert_subst,
+)
+
 # CSS-standard wght-axis named instances. Source Han / Noto CJK ships
 # a Sans/Serif-inconsistent set (Sans has Thin + DemiLight, Serif has
 # ExtraLight + SemiBold; only Light/Regular/Medium/Bold/Black overlap).
@@ -40,21 +55,6 @@ CANONICAL_INSTANCES: list[tuple[int, str]] = [
     (900, "Black"),
 ]
 INSTANCE_FLAG_ELIDABLE = 0x0001  # OpenType fvar: hide name in font menus
-
-from diantenjeom import (
-    center_punct,
-    circle,
-    codepoints,
-    dash_center,
-    ellipsis_pair,
-    gpos_graft,
-    graft,
-    middle_dot,
-    pin_locale,
-    rotate_quotes,
-    vert_nudge,
-    vert_subst,
-)
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist"
