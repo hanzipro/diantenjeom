@@ -186,6 +186,9 @@ article {
 
   h1 {
     & {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
       column-span: all;
       font-size: 1.75em;
       font-weight: bolder;
@@ -196,16 +199,19 @@ article {
     .category {
       display: block;
       font-weight: 200;
-      font-size: .55em;
+      font-size: .875rem;
     }
-  }
-
-  h2 {
-    font-weight: bolder;
   }
 
   :where(h1, h2, h3, h4, h5, h6, p) {
     margin: 0;
+  }
+
+  h2 {
+    margin-block-start: 0.25rem;
+    font-size: 1.125em;
+    font-weight: bolder;
+    line-height: 24px;
   }
 
   p {
@@ -235,14 +241,14 @@ article {
   /* Toggles via header :has() sibling selector. */
   header:has(input[name="vertical"]:checked)~& {
     writing-mode: vertical-rl;
-    block-size: 52em;
+    block-size: 47rem;
     /* page width in vertical; cols + inline-size are JS-set */
     columns: auto 12em;
     column-fill: auto;
   }
 
   header:has(input[name="vertical"]:not(:checked))~& {
-    inline-size: 52em;
+    inline-size: 52rem;
   }
 
   header:has(input[name="serif"]:checked)~& {
