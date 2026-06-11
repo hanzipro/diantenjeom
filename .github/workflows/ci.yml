@@ -23,10 +23,25 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Lint
-        run: ruff check src scripts
+        run: ruff check src scripts tests
 
       - name: Build fonts
         run: python scripts/build_fonts.py
+
+      - name: Structural tests
+        run: pytest -q
+
+      - name: Font QA (fontbakery)
+        # Advisory for now: the universal profile flags subsetting-specific
+        # noise (missing Latin coverage, whitespace glyphs) that doesn't
+        # apply to a punctuation-only font. Surfaces real issues (OFL/license
+        # metadata, name-table hygiene) without blocking. Tighten via
+        # --exclude-checkid once the report is triaged, then drop the `|| true`.
+        run: |
+          fontbakery check-universal \
+            --ghmarkdown fontbakery-report.md \
+            dist/fonts/*.otf || true
+          cat fontbakery-report.md || true
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4

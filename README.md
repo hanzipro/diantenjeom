@@ -30,8 +30,9 @@ face.
 Each style ships as a separate variable font; pick by punctuation positioning
 convention, not by language tag.
 
-Three punctuation conventions, each named after the authoritative
-regional standard. Naming is intentionally decoupled from text locale,
+Four variants — three named after the authoritative regional standard whose
+punctuation positioning they follow (JIS / MOE / GB), plus KV for Korean
+vertical typesetting. Naming is intentionally decoupled from text locale,
 so you can pair any variant with any CJK text font (e.g. Japanese text
 with MOE punctuation, TC text with JIS punctuation).
 
@@ -43,15 +44,82 @@ with MOE punctuation, TC text with JIS punctuation).
 | `Diantenjeom Serif MOE`         | Serif    | 同上                                                  |
 | `Diantenjeom Sans GB`           | Sans     | GB/T 15834 — 、，。：；！？ side-aligned              |
 | `Diantenjeom Serif GB`          | Serif    | 同上                                                  |
+| `Diantenjeom Sans KV`           | Sans     | Korean vertical — JP-based, `：` upright; no standards body |
+| `Diantenjeom Serif KV`          | Serif    | 同上                                                  |
 
 Each variant exposes the full `wght` axis (Sans 100–900, Serif 200–900) with
 named instances on the CSS-standard grid: Thin / ExtraLight / Light / Regular
 / Medium / SemiBold / Bold / ExtraBold / Black.
 
+**KV** is descriptive, not an authority reference — Korean has no standardised
+vertical-punctuation spec (한글 맞춤법 dropped its vertical chapter in 2015). It
+reuses the JP design with `：` kept upright, and is meant for vertical contexts
+(signage, calligraphy, mixed Hangul–Hanja prose). See
+[docs/notes/korean-vertical-punctuation.md](docs/notes/korean-vertical-punctuation.md).
+
+## Usage
+
+Install:
+
+```sh
+npm install @han.css/diantenjeom
+```
+
+Load the stylesheet — it ships the `@font-face` blocks:
+
+```css
+@import "@han.css/diantenjeom/css";
+```
+
+or, with a bundler:
+
+```js
+import "@han.css/diantenjeom";
+```
+
+Then put a Diantenjeom family **before** your CJK text font in the
+`font-family` fallback chain:
+
+```css
+body {
+  font-family:
+    "Helvetica Neue",        /* Latin body                              */
+    "Diantenjeom Sans MOE",  /* punctuation — must precede the CJK font */
+    "Noto Sans TC",          /* CJK body                                */
+    sans-serif;
+}
+```
+
+Each `@font-face` carries a `unicode-range` covering only the ~30 punctuation
+codepoints, so the browser pulls Diantenjeom **only** for those characters and
+falls through to the next font for everything else (Han, kana, Hangul, Latin).
+That's why it has to sit ahead of the CJK font — otherwise the CJK font's own
+punctuation wins. Pick the convention independently of your text language: pair
+`Diantenjeom Sans MOE` with Japanese text, `Diantenjeom Serif JIS` with
+Traditional Chinese, and so on.
+
+> **Markup caveat.** Browser pair-squeezing (`text-spacing-trim`) only collapses
+> adjacent punctuation that share an inline formatting context. Splitting two
+> glyphs across separate *atomic-inline* boxes — `display: inline-block` /
+> `inline-flex` / `inline-grid`, as some frameworks emit when wrapping
+> characters — silently disables the squeeze; plain inline `<span>`s are fine.
+> See [docs/pair-squeeze-and-markup.md](docs/pair-squeeze-and-markup.md).
+
+### Without a build step
+
+Copy `dist/diantenjeom.css` and `dist/fonts/` to your site and link the CSS
+directly. The `@font-face` `src` URLs are relative to the stylesheet, so keep
+`fonts/` next to it.
+
+### Desktop apps (InDesign, etc.)
+
+Install the OTFs from `dist/fonts/` and add a Diantenjeom family ahead of your
+CJK font in a composite-font / fallback list — the same ordering rule applies.
+
 ## Status
 
 Early. APIs, file names, and the punctuation codepoint set are all subject to
-change. More docs and examples to come.
+change. More docs to come.
 
 ## TODO
 

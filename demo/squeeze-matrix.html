@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>diantenjeom — pair-squeeze matrix probe</title>
+<style>
+  @import "./diantenjeom.css";
+  html, body { margin: 0; }
+  /* The measuring stage. font-family / writing-mode are set from JS per the
+     ?variant&style&dir query. EM is fixed at 100px for clean numbers. */
+  #stage {
+    font-size: 100px;
+    line-height: 2;
+    white-space: nowrap;
+    position: absolute;
+    visibility: hidden;          /* measured, not shown */
+  }
+  #stage.notrim { text-spacing-trim: space-all; }  /* true "no squeeze" baseline */
+  #stage.trim   { text-spacing-trim: trim-start; }
+  #stage.vert   { writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; }
+
+  /* Visible status / result, so the page is also human-openable. */
+  #status { font: 14px ui-monospace, monospace; padding: 0 1rem; white-space: pre-wrap; }
+  #RESULT { display: none; }
+
+  /* Config switcher for manual inspection. */
+  #nav { font: 13px ui-monospace, monospace; padding: .6rem 1rem; line-height: 2; border-bottom: 1px solid #eee; }
+  #nav a { margin-right: .35rem; text-decoration: none; padding: 1px 6px; border: 1px solid #ccc; border-radius: 4px; color: #333; }
+  #nav a.cur { background: #222; color: #fff; border-color: #222; }
+
+  /* Every squeezing pair, rendered as shipped (font + trim + writing-mode). */
+  #grid { display: flex; flex-wrap: wrap; gap: .4rem; padding: 1rem; }
+  #grid .cell { border: 1px solid #eee; border-radius: 5px; padding: .25rem .4rem; display: flex; flex-direction: column; align-items: center; }
+  #grid .pair { font-size: 34px; text-spacing-trim: trim-start; line-height: 1.2; }
+  #grid.vert .pair { writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; }
+  #grid .amt { font: 10px ui-monospace, monospace; color: #aaa; margin-top: 2px; }
+</style>
+</head>
+<body>
+<nav id="nav"></nav>
+<div id="stage"></div>
+<div id="status">measuring…</div>
+<pre id="RESULT"></pre>
+<div id="grid"></div>
+
+<script>
+  const EM = 100;
+  const THRESHOLD = 0.05;   // savedEm below this counts as "no squeeze" (sub-px noise)
+
+  // Kinsoku-relevant classes (cross-producted), plus neutral controls that
+  // should NOT squeeze (negative cases).
+  const OPEN    = ["「","『","《","〈","（","〔","【","〖","〘","〚","［","｛"];
+  const CLOSE   = ["」","』","》","〉","）","〕","】","〗","〙","〛","］","｝"];
+  const PERIOD  = ["。","．"];
+  const COMMA   = ["、","，"];
+  const COLON   = ["：","；"];
+  const BANG    = ["！","？"];
+  const MIDDOT  = ["・","·"];
+  const QUOTE   = ["“","”","‘","’"];
+  const CONTROL = ["—","…","／","●","永"];   // neutral controls (expect ~0)
+  const CHARS = [...OPEN, ...CLOSE, ...PERIOD, ...COMMA, ...COLON,
+                 ...BANG, ...MIDDOT, ...QUOTE, ...CONTROL];
+
+  // Read from hash first (survives `serve`'s clean-URL redirect, which drops
+  // the query string), then query string (used by the headless driver).
+  const hashP = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const queryP = new URLSearchParams(location.search);
+  const param = (k, d) => (hashP.get(k) || queryP.get(k) || d).toLowerCase();
+  const variant = param("variant", "jis");   // jis|moe|gb|kv
+  const style   = param("style", "sans");     // sans|serif
+  const dir     = param("dir", "h");          // h|v
+  // Switching config via the nav re-runs the measurement.
+  addEventListener("hashchange", () => location.reload());
+
+  const FAMILY = `Diantenjeom ${style[0].toUpperCase()}${style.slice(1)} ${variant.toUpperCase()}`;
+  const FALLBACK = style === "serif"
+    ? "'Hiragino Mincho ProN', 'Yu Mincho', serif"
+    : "'Hiragino Sans', 'Yu Gothic', sans-serif";
+
+  const stage = document.getElementById("stage");
+  stage.style.fontFamily = `'${FAMILY}', ${FALLBACK}`;
+  if (dir === "v") stage.classList.add("vert");
+
+  // Config switcher (14 configs: kv is vertical-only). Doesn't need fonts.
+  (function buildNav() {
+    const all = [];
+    for (const v of ["jis", "moe", "gb", "kv"])
+      for (const s of ["sans", "serif"])
+        for (const d of ["h", "v"])
+          if (!(v === "kv" && d === "h")) all.push([v, s, d]);
+    const nav = document.getElementById("nav");
+    for (const [v, s, d] of all) {
+      const a = document.createElement("a");
+      a.href = `#variant=${v}&style=${s}&dir=${d}`;
+      a.textContent = `${v.toUpperCase()} ${s} ${d === "v" ? "↕" : "↔"}`;
+      if (v === variant && s === style && d === dir) a.className = "cur";
+      nav.appendChild(a);
+    }
+  })();
+
+  // Measure the inline extent of the punctuation pair, kept mid-line by a
+  // leading/trailing Han so neither glyph sits at the line start/end.
+  function extent(a, b, trim) {
+    stage.className = (dir === "v" ? "vert " : "") + (trim ? "trim" : "notrim");
+    stage.innerHTML = '永<span class="probe"></span>永';
+    const probe = stage.querySelector(".probe");
+    probe.textContent = a + b;
+    const r = probe.getBoundingClientRect();
+    return dir === "v" ? r.height : r.width;
+  }
+
+  function savedEm(a, b) {
+    const natural  = extent(a, b, false);
+    const squeezed = extent(a, b, true);
+    return (natural - squeezed) / EM;
+  }
+
+  (async () => {
+    try {
+      await document.fonts.load(`${EM}px '${FAMILY}'`, CHARS.join(""));
+    } catch (e) { /* fall through — measurement will reveal a load failure */ }
+    await document.fonts.ready;
+
+    const squeeze = {};
+    let tested = 0;
+    for (const a of CHARS) {
+      for (const b of CHARS) {
+        tested++;
+        const s = savedEm(a, b);
+        if (s >= THRESHOLD) squeeze[a + b] = Math.round(s * 100) / 100;
+      }
+    }
+
+    const result = {
+      meta: {
+        variant, style, dir,
+        family: FAMILY,
+        em: EM,
+        chars: CHARS.length,
+        pairs_tested: tested,
+        pairs_squeezed: Object.keys(squeeze).length,
+        font_loaded: document.fonts.check(`${EM}px '${FAMILY}'`),
+      },
+      squeeze,
+    };
+
+    document.getElementById("RESULT").textContent = JSON.stringify(result);
+    document.getElementById("status").textContent =
+      `${FAMILY} · ${dir === "v" ? "vertical" : "horizontal"}\n` +
+      `font loaded: ${result.meta.font_loaded}\n` +
+      `pairs tested: ${tested} · squeezed: ${result.meta.pairs_squeezed}`;
+
+    // Render every squeezing pair as shipped, so the result is eyeball-able.
+    const grid = document.getElementById("grid");
+    grid.style.fontFamily = `'${FAMILY}', ${FALLBACK}`;
+    if (dir === "v") grid.classList.add("vert");
+    const entries = Object.entries(squeeze)
+      .sort((x, y) => (y[1] - x[1]) || x[0].localeCompare(y[0]));
+    for (const [pair, amt] of entries) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const p = document.createElement("span");
+      p.className = "pair";
+      p.textContent = pair;
+      const a = document.createElement("span");
+      a.className = "amt";
+      a.textContent = amt;
+      cell.append(p, a);
+      grid.appendChild(cell);
+    }
+
+    document.title = "DONE " + document.title;
+  })();
+</script>
+</body>
+</html>

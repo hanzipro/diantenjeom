@@ -11,7 +11,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.7"]
+dev = [
+    "ruff>=0.7",
+    "pytest>=8.0",
+    "fontbakery>=0.12",
+]
 
 [tool.ruff]
 line-length = 100

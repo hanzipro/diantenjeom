@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>diantenjeom — pair squeeze across &lt;span&gt; boundaries</title>
+<style>
+  @import "./diantenjeom.css";
+
+  :root {
+    /* Punctuation from Diantenjeom; Han falls through to the system JP font. */
+    --jis: 'Diantenjeom Sans JIS', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+  }
+
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 2rem auto;
+    max-width: 60rem;
+    padding: 0 1.5rem;
+    color: #222;
+    line-height: 1.6;
+  }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1rem; color: #555; margin-top: 2rem; }
+  p.lead { color: #444; max-width: 44rem; }
+  code { font-family: ui-monospace, monospace; background: #f0f0f0; padding: 0 .25em; border-radius: 3px; }
+
+  table { border-collapse: collapse; margin: 1rem 0 2rem; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: .5rem .7rem; text-align: left; vertical-align: middle; }
+  th { background: #f7f7f7; font-weight: 600; font-size: .85rem; }
+  td.num { font-family: ui-monospace, monospace; text-align: right; white-space: nowrap; }
+
+  /* The specimen text. The .probe span is what we measure. A leading Han
+     keeps the closing punctuation off the line start so trim-start's
+     line-start handling doesn't confound the adjacent-pair collapse. */
+  .specimen {
+    font-family: var(--jis);
+    font-weight: 400;
+    font-size: 48px;
+    /* highlight the measured probe so the squeeze is visible to the eye too */
+  }
+  .specimen .probe { background: rgba(255, 196, 0, .35); }
+  /* Atomic-inline containers make each glyph its own formatting context —
+     a common way framework-generated markup defeats trimming. */
+  .ib > span    { display: inline-block; }
+  .iflex > span { display: inline-flex; }
+  .ig > span    { display: inline-grid; }
+
+  .trim   { text-spacing-trim: trim-start; }
+  /* `space-all` is the true "no trimming" baseline — every full-width
+     punctuation keeps its full advance. NOTE: `normal` is NOT no-trim;
+     per CSS Text 4 it already collapses like `space-first`. */
+  .notrim { text-spacing-trim: space-all; }
+
+  .verdict { font-weight: 600; }
+  .ok   { color: #137333; }
+  .bad  { color: #c5221f; }
+  .meh  { color: #b06000; }
+
+  /* Vertical visual check */
+  .v-wrap { display: flex; gap: 2rem; align-items: flex-start; margin: 1rem 0; }
+  .v-col {
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    font-family: var(--jis);
+    font-size: 48px;
+    border: 1px solid #ddd;
+    padding: .6rem;
+    background: #fff;
+  }
+  .v-col .probe { background: rgba(255, 196, 0, .35); }
+  .v-label { writing-mode: horizontal-tb; font-size: .8rem; color: #888; font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+
+<h1>Pair squeeze across <code>&lt;span&gt;</code> boundaries</h1>
+
+<p class="lead">
+  Does <code>text-spacing-trim: trim-start</code> still collapse the space
+  between two adjacent full-width punctuation glyphs when an inline element
+  boundary sits between them — i.e. <code>》。</code> vs
+  <code>&lt;span&gt;》&lt;/span&gt;&lt;span&gt;。&lt;/span&gt;</code>?
+</p>
+
+<p class="lead">
+  Each row measures the rendered width of the highlighted <code>.probe</code>
+  (the punctuation pair only, kept off the line start by a leading Han).
+  <b>natural</b> = no trim (upper bound). <b>same-node</b> = trim, one text
+  node. <b>split-span</b> = trim, each glyph in its own <code>&lt;span&gt;</code>.
+  If <b>split-span ≈ natural</b> (i.e. ≫ same-node), the span boundary defeats
+  the squeeze.
+</p>
+
+<table id="results">
+  <thead>
+    <tr>
+      <th>pair</th>
+      <th class="num">natural (px)</th>
+      <th class="num">same-node (px)</th>
+      <th class="num">split-span (px)</th>
+      <th class="num">inline-block (px)</th>
+      <th>split keeps squeeze?</th>
+    </tr>
+  </thead>
+  <tbody><!-- filled by JS --></tbody>
+</table>
+
+<h2>What kind of split breaks it? (<code>》。</code>)</h2>
+<p class="lead">
+  Same pair, different container markup. The rule is <b>not</b> "inline-block"
+  or "separate elements" — it is whether the two glyphs share an inline
+  formatting context. Splitting them across <em>atomic-inline</em> boxes
+  (inline-block / -flex / -grid) breaks the squeeze; plain inline spans (any
+  nesting), or both glyphs in one box, keep it.
+</p>
+<table id="containers">
+  <thead>
+    <tr>
+      <th>markup</th>
+      <th class="num">width (px)</th>
+      <th>squeeze</th>
+    </tr>
+  </thead>
+  <tbody><!-- filled by JS --></tbody>
+</table>
+
+<h2>Rendered specimens (horizontal)</h2>
+<div id="specimens"></div>
+
+<h2>Vertical (visual)</h2>
+<div class="v-wrap" id="vertical">
+  <div>
+    <div class="v-label">same-node</div>
+    <div class="v-col trim">あ<span class="probe">》。</span>い</div>
+  </div>
+  <div>
+    <div class="v-label">split-span</div>
+    <div class="v-col trim">あ<span class="probe"><span>》</span><span>。</span></span>い</div>
+  </div>
+  <div>
+    <div class="v-label">no trim</div>
+    <div class="v-col notrim">あ<span class="probe">》。</span>い</div>
+  </div>
+</div>
+
+<script>
+  // Closing-side pairs commonly subject to internal-space collapse.
+  const PAIRS = [
+    ["》。", "》。"],   // close book-title + full stop  (the reported case)
+    ["」。", "」。"],   // close corner + full stop
+    ["）。", "）。"],   // close paren + full stop
+    ["》、", "》、"],   // close book-title + comma
+    ["。「", "。「"],   // full stop + open corner (close→open)
+  ];
+
+  const LEAD = "あ"; // あ — keeps the pair off the line start
+
+  // Build a measurable specimen line. `mode`:
+  //   'natural'  no trim, one text node
+  //   'same'     trim,   one text node
+  //   'split'    trim,   each glyph in its own <span>
+  // Container class applied to .probe when each glyph is split into its own
+  // child span. Empty string = plain inline children.
+  const SPLIT_CONTAINER = { split: "", ib: "ib", iflex: "iflex", ig: "ig" };
+
+  function makeLine(pair, mode) {
+    const line = document.createElement("div");
+    line.className = "specimen " + (mode === "natural" ? "notrim" : "trim");
+    line.appendChild(document.createTextNode(LEAD));
+    const probe = document.createElement("span");
+    probe.className = "probe";
+
+    if (mode in SPLIT_CONTAINER) {
+      // One child box per glyph (atomic when the container class makes them so).
+      if (SPLIT_CONTAINER[mode]) probe.classList.add(SPLIT_CONTAINER[mode]);
+      for (const ch of pair) {
+        const s = document.createElement("span");
+        s.textContent = ch;
+        probe.appendChild(s);
+      }
+    } else if (mode === "nested") {
+      // Both glyphs in deeply nested *plain inline* spans — same IFC.
+      for (const ch of pair) {
+        const outer = document.createElement("span");
+        const inner = document.createElement("span");
+        inner.textContent = ch;
+        outer.appendChild(inner);
+        probe.appendChild(outer);
+      }
+    } else if (mode === "ibOne") {
+      // BOTH glyphs inside ONE inline-block — they share an IFC, so squeeze.
+      const box = document.createElement("span");
+      box.style.display = "inline-block";
+      box.textContent = pair;
+      probe.appendChild(box);
+    } else {
+      // natural / same — one text node
+      probe.textContent = pair;
+    }
+
+    line.appendChild(probe);
+    line.appendChild(document.createTextNode("い")); // trailing い
+    return { line, probe };
+  }
+
+  function measure(pair, mode) {
+    const { line, probe } = makeLine(pair, mode);
+    document.getElementById("specimens").appendChild(line);
+    // width of just the probe's content
+    return probe.getBoundingClientRect().width;
+  }
+
+  function fmt(n) { return n.toFixed(1); }
+
+  document.fonts.ready.then(() => {
+    const tbody = document.querySelector("#results tbody");
+    for (const [pair, label] of PAIRS) {
+      const natural = measure(pair, "natural");
+      const same    = measure(pair, "same");
+      const split   = measure(pair, "split");
+      const ib      = measure(pair, "ib");
+
+      const savedSame  = natural - same;     // how much trim collapsed
+      const savedSplit = natural - split;
+      const savedIb    = natural - ib;
+      // Summarise per mode whether (most of) the same-node squeeze survives.
+      // Tolerance: within 15% of the same-node saving counts as "kept".
+      const tag = (saved) => {
+        if (savedSame < 2) return "n/a";
+        if (saved >= savedSame * 0.85) return "kept";
+        if (saved <= savedSame * 0.15) return "lost";
+        return "partial";
+      };
+      const split_t = tag(savedSplit), ib_t = tag(savedIb);
+      let verdict, cls;
+      if (savedSame < 2) { verdict = "n/a — no squeeze even same-node"; cls = "meh"; }
+      else if (split_t === "kept" && ib_t === "kept") { verdict = "✅ both kept"; cls = "ok"; }
+      else { verdict = `split: ${split_t} · inline-block: ${ib_t}`; cls = (split_t === "lost" || ib_t === "lost") ? "bad" : "meh"; }
+
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td style="font-size:1.4rem">${label}</td>` +
+        `<td class="num">${fmt(natural)}</td>` +
+        `<td class="num">${fmt(same)}</td>` +
+        `<td class="num">${fmt(split)}</td>` +
+        `<td class="num">${fmt(ib)}</td>` +
+        `<td class="verdict ${cls}">${verdict}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    // Second table: one pair (》。), many container shapes.
+    const PAIR = "》。";
+    const naturalW = measure(PAIR, "natural");
+    const squeezedW = measure(PAIR, "same");
+    const CONTAINERS = [
+      ["one text node", "same"],
+      ["two plain inline <span>", "split"],
+      ["deeply nested inline <span>", "nested"],
+      ["both glyphs in ONE inline-block", "ibOne"],
+      ["two inline-block <span>", "ib"],
+      ["two inline-flex <span>", "iflex"],
+      ["two inline-grid <span>", "ig"],
+    ];
+    const cbody = document.querySelector("#containers tbody");
+    for (const [label, mode] of CONTAINERS) {
+      const w = measure(PAIR, mode);
+      const squeezed = Math.abs(w - squeezedW) < 2;
+      const cls = squeezed ? "ok" : "bad";
+      const mark = squeezed ? "✅ squeezed" : "❌ full width (lost)";
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td><code>${label}</code></td>` +
+        `<td class="num">${fmt(w)}</td>` +
+        `<td class="verdict ${cls}">${mark}</td>`;
+      cbody.appendChild(tr);
+    }
+  });
+</script>
+
+</body>
+</html>
