@@ -25,6 +25,19 @@ jobs:
       - name: Lint
         run: ruff check src scripts tests
 
+      # The ~329 MB of upstream Noto CJK VF sources are gitignored and fetched
+      # on demand (pinned + SHA-256-verified against sources/sources.lock.json).
+      # Cache them keyed on the lockfile so only a lockfile bump re-downloads;
+      # on a hit, the fetch step just re-verifies checksums and is near-instant.
+      - name: Cache Noto CJK sources
+        uses: actions/cache@v4
+        with:
+          path: sources
+          key: noto-cjk-${{ hashFiles('sources/sources.lock.json') }}
+
+      - name: Fetch sources
+        run: python scripts/fetch_sources.py
+
       - name: Build fonts
         run: python scripts/build_fonts.py
 
