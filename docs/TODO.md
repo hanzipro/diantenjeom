@@ -89,16 +89,28 @@
 
 ## Tooling / CI (added 2026-06-14)
 
-- **Wire the pair-squeeze regression into CI.** `scripts/check_squeeze.py`
-  (snapshot in `tests/squeeze-snapshot.json`) is runnable but not yet in
-  `ci.yml` — deferred for now (manual `python scripts/check_squeeze.py`).
-  GitHub `ubuntu-latest` ships `google-chrome`, so the step is just
-  `python scripts/check_squeeze.py` after the build step.
-- **Tighten fontbakery once triaged.** The CI step is advisory (`|| true`)
-  because `check-universal` flags subsetting noise (missing Latin coverage,
-  whitespace glyphs) irrelevant to a punctuation-only font. Triage the
-  report, `--exclude-checkid` the noise, then drop the `|| true` to make it
-  a hard gate (it also catches real OFL/name-table issues).
+- ~~**Wire the pair-squeeze regression into CI.**~~ ✅ Done 2026-06-14:
+  `ci.yml` runs `python scripts/check_squeeze.py` after the structural tests
+  (ubuntu-latest ships `google-chrome`). Watch for cross-platform snapshot
+  drift — the snapshot was generated on macOS Chrome; pair-squeeze is advance-
+  based so it *should* be platform-stable, but a Chrome-version bump could
+  shift amounts. If CI flags spurious diffs, re-`--update` on the runner.
+- ~~**Tighten fontbakery once triaged.**~~ ✅ Done 2026-06-14: the CI step is
+  now a hard gate (no `|| true`), running **per-file** (each `.otf` is its own
+  family) with eight triaged `--exclude-checkid`s. Rationale for each exclude
+  is inline in `ci.yml`. Triaged against fontbakery 1.1.0 — re-triage if a
+  version bump adds/renames checks.
+- **Deferred genuine font fixes (surfaced by the fontbakery triage).** Two
+  excluded FAILs are real metadata nits, not subsetting noise — excluded only
+  because fixing them is a build-pipeline change (rebuild + retest) out of
+  scope for the CI wiring. Fix in `_canonicalize_instances`
+  (`src/diantenjeom/build.py`) then drop the matching `-x` from `ci.yml`:
+  - `opentype/varfont/valid_default_instance_nameids` — the instance whose
+    coords equal the fvar default (Thin) should carry the bare PostScript name
+    (`DiantenjeomSansJIS`), not the `-Thin`-suffixed form.
+  - `opentype/fsselection` — the default instance's OS/2.fsSelection Regular
+    bit (bit 6) isn't set. Likely shares a root cause with the above: the fvar
+    default sits at Thin rather than a Regular (400) location.
 - **New files under `docs/` need `git add -f`.** A global gitignore
   (`~/.gitignore_global`) ignores `docs/`; already-tracked docs are fine,
   but newly created ones are silently skipped unless force-added.

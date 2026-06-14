@@ -31,17 +31,55 @@ jobs:
       - name: Structural tests
         run: pytest -q
 
+      - name: Pair-squeeze regression
+        # Drives demo/squeeze-matrix.html with the runner's headless Chrome
+        # (ubuntu-latest ships google-chrome) and diffs which punctuation pairs
+        # text-spacing-trim squeezes against tests/squeeze-snapshot.json.
+        # Catches font-side regressions that silently disable pair-squeeze.
+        run: python scripts/check_squeeze.py
+
       - name: Font QA (fontbakery)
-        # Advisory for now: the universal profile flags subsetting-specific
-        # noise (missing Latin coverage, whitespace glyphs) that doesn't
-        # apply to a punctuation-only font. Surfaces real issues (OFL/license
-        # metadata, name-table hygiene) without blocking. Tighten via
-        # --exclude-checkid once the report is triaged, then drop the `|| true`.
+        # Hard gate. Each shipped .otf is its own independent family (a drop-in
+        # punctuation fallback face), so we run fontbakery per-file: passing all
+        # eight at once makes it treat them as one 8-member family and flag bogus
+        # cross-family inconsistencies (family name, axis ranges, vertical
+        # metrics). Per-file modelling removes those with zero suppression.
+        #
+        # Excluded check-ids (triaged 2026-06-14, fontbakery 1.1.0), with why:
+        #   hinting_impact ........... fontbakery bug: IndexError crash on CFF2
+        #   whitespace_glyphs ........ no U+0020/U+00A0 in a punctuation-only subset
+        #   family/win_ascent_and_descent, os2_metrics_match_hhea
+        #       inherited Noto CJK vertical metrics; this is a fallback face (the
+        #       host font drives linespacing) and we deliberately tune vmtx for
+        #       vertical text — see docs/vertical-text.md
+        #   inconsistencies_between_fvar_STAT
+        #       build.py rebuilds fvar instances but intentionally leaves STAT
+        #       alone (see _canonicalize_instances in src/diantenjeom/build.py)
+        #   opentype/fsselection, opentype/varfont/valid_default_instance_nameids
+        #       VF default-instance bit/naming nits, low-impact for web woff2 —
+        #       tracked as a deferred font fix in docs/TODO.md
+        #   name/family_and_style_max_length
+        #       'Diantenjeom Serif JIS ExtraLight' is 32 chars, 1 over the old-GDI
+        #       Windows-font-menu limit; irrelevant to web woff2
+        # WARN-level results (xAvgCharWidth, post v3, cjk-not-enough-glyphs,
+        # unreachable-glyphs, ots) stay visible but advisory — they don't block.
         run: |
-          fontbakery check-universal \
-            --ghmarkdown fontbakery-report.md \
-            dist/fonts/*.otf || true
-          cat fontbakery-report.md || true
+          rc=0
+          for f in dist/fonts/*.otf; do
+            echo "::group::fontbakery $(basename "$f")"
+            fontbakery check-universal \
+              -x hinting_impact \
+              -x whitespace_glyphs \
+              -x family/win_ascent_and_descent \
+              -x os2_metrics_match_hhea \
+              -x inconsistencies_between_fvar_STAT \
+              -x opentype/fsselection \
+              -x opentype/varfont/valid_default_instance_nameids \
+              -x name/family_and_style_max_length \
+              "$f" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
