@@ -86,3 +86,19 @@
   `vert` substitutions for UTR50 R-class codepoints, but they can't
   ignore the outline of the glyph they're rendering. See
   `docs/vertical-text.md` § "Dash alignment" → "Update (2026-05-14)".
+
+## Tooling / CI (added 2026-06-14)
+
+- **Wire the pair-squeeze regression into CI.** `scripts/check_squeeze.py`
+  (snapshot in `tests/squeeze-snapshot.json`) is runnable but not yet in
+  `ci.yml` — deferred for now (manual `python scripts/check_squeeze.py`).
+  GitHub `ubuntu-latest` ships `google-chrome`, so the step is just
+  `python scripts/check_squeeze.py` after the build step.
+- **Tighten fontbakery once triaged.** The CI step is advisory (`|| true`)
+  because `check-universal` flags subsetting noise (missing Latin coverage,
+  whitespace glyphs) irrelevant to a punctuation-only font. Triage the
+  report, `--exclude-checkid` the noise, then drop the `|| true` to make it
+  a hard gate (it also catches real OFL/name-table issues).
+- **New files under `docs/` need `git add -f`.** A global gitignore
+  (`~/.gitignore_global`) ignores `docs/`; already-tracked docs are fine,
+  but newly created ones are silently skipped unless force-added.
