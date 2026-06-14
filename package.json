@@ -25,6 +25,10 @@
   "exports": {
     ".": "./dist/diantenjeom.css",
     "./css": "./dist/diantenjeom.css",
+    "./jis": "./dist/jis.css",
+    "./moe": "./dist/moe.css",
+    "./gb": "./dist/gb.css",
+    "./kv": "./dist/kv.css",
     "./fonts/*": "./dist/fonts/*",
     "./package.json": "./package.json"
   },

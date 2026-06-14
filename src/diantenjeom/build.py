@@ -455,8 +455,10 @@ def _face_block(family: str, stem: str, wmin: int, wmax: int, unicodes: list[int
     )
 
 
-def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
-    weight_by_stem = {v.stem: wr for v, wr in entries}
+def _css_blocks(
+    entries: list[tuple[Variant, tuple[int, int]]],
+    weight_by_stem: dict[str, tuple[int, int]],
+) -> list[str]:
     blocks: list[str] = []
     for v, (wmin, wmax) in entries:
         # Main face — exclude any codepoints delegated to a sibling
@@ -480,9 +482,37 @@ def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> Path:
                     list(v.css_delegate_cps),
                 )
             )
-    out = DIST / "diantenjeom.css"
-    out.write_text("\n\n".join(blocks) + "\n", encoding="utf-8")
-    return out
+    return blocks
+
+
+def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> list[Path]:
+    """Emit the combined stylesheet plus one per punctuation standard.
+
+    `diantenjeom.css` carries every variant; `{punct}.css` (jis / moe / gb /
+    kv) carries only that standard's faces, for callers who need a single
+    convention and don't want to ship the others' @font-face rules. The
+    weight-range map is built from the *full* entry list so a per-file
+    delegated face can still resolve its donor's font-weight range even when
+    the donor lives in another standard's group.
+    """
+    weight_by_stem = {v.stem: wr for v, wr in entries}
+
+    def _emit(path: Path, group: list[tuple[Variant, tuple[int, int]]]) -> Path:
+        path.write_text(
+            "\n\n".join(_css_blocks(group, weight_by_stem)) + "\n",
+            encoding="utf-8",
+        )
+        return path
+
+    written = [_emit(DIST / "diantenjeom.css", entries)]
+
+    by_punct: dict[str, list[tuple[Variant, tuple[int, int]]]] = {}
+    for entry in entries:
+        by_punct.setdefault(entry[0].punct, []).append(entry)
+    for punct, group in by_punct.items():
+        written.append(_emit(DIST / f"{punct}.css", group))
+
+    return written
 
 
 def main() -> None:
@@ -682,8 +712,8 @@ def main() -> None:
             print(f"built {path.relative_to(ROOT)}")
         entries.append((v, weight_range))
 
-    css = write_css(entries)
-    print(f"wrote {css.relative_to(ROOT)}")
+    for css in write_css(entries):
+        print(f"wrote {css.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

@@ -77,6 +77,14 @@ or, with a bundler:
 import "@han.css/diantenjeom";
 ```
 
+The default stylesheet ships every convention (JIS / MOE / GB / KV). If you
+only need one, import just that standard to skip the others' `@font-face`
+rules:
+
+```css
+@import "@han.css/diantenjeom/moe"; /* also: /jis, /gb, /kv */
+```
+
 Then put a Diantenjeom family **before** your CJK text font in the
 `font-family` fallback chain:
 
