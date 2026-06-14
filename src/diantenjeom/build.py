@@ -443,13 +443,33 @@ def _unicode_range(unicodes: list[int]) -> str:
     return ", ".join(parts)
 
 
-def _face_block(family: str, stem: str, wmin: int, wmax: int, unicodes: list[int]) -> str:
+# font-display modes we ship. `swap` is the default, served from the dist/
+# root; `block` and `optional` are opt-in via dist/<mode>/ subpaths (mirrors
+# the sibling ziano webfont packages). swap shows the host font's punctuation
+# immediately and swaps in our positioning (the fallback glyph is fully
+# legible, so the only cost is a brief in-em-box shift); block hides the
+# punctuation until our font loads (no shift, but invisible on a slow fetch);
+# optional uses our font only if it loads near-instantly (else never swaps —
+# first-time visitors may not get the convention). See docs/TODO.md / README.
+FONT_DISPLAYS = ("swap", "block", "optional")
+
+
+def _face_block(
+    family: str,
+    stem: str,
+    wmin: int,
+    wmax: int,
+    unicodes: list[int],
+    *,
+    font_display: str,
+    font_dir: str,
+) -> str:
     return (
         "@font-face {\n"
         f"  font-family: '{family}';\n"
-        f"  src: url('./fonts/{stem}.woff2') format('woff2-variations');\n"
+        f"  src: url('{font_dir}{stem}.woff2') format('woff2-variations');\n"
         f"  font-weight: {wmin} {wmax};\n"
-        "  font-display: swap;\n"
+        f"  font-display: {font_display};\n"
         f"  unicode-range: {_unicode_range(unicodes)};\n"
         "}"
     )
@@ -458,13 +478,26 @@ def _face_block(family: str, stem: str, wmin: int, wmax: int, unicodes: list[int
 def _css_blocks(
     entries: list[tuple[Variant, tuple[int, int]]],
     weight_by_stem: dict[str, tuple[int, int]],
+    *,
+    font_display: str,
+    font_dir: str,
 ) -> list[str]:
     blocks: list[str] = []
     for v, (wmin, wmax) in entries:
         # Main face — exclude any codepoints delegated to a sibling
         # variant's font file via @font-face unicode-range split.
         main_cps = [cp for cp in v.unicodes if cp not in v.css_delegate_cps]
-        blocks.append(_face_block(v.family, v.stem, wmin, wmax, main_cps))
+        blocks.append(
+            _face_block(
+                v.family,
+                v.stem,
+                wmin,
+                wmax,
+                main_cps,
+                font_display=font_display,
+                font_dir=font_dir,
+            )
+        )
         # Delegated face(s) — same family name, different woff2 + a
         # narrow unicode-range. Lets the browser pick the donor's glyph
         # for the delegated codepoints while leaving Chrome's per-face
@@ -480,37 +513,60 @@ def _css_blocks(
                     donor_wmin,
                     donor_wmax,
                     list(v.css_delegate_cps),
+                    font_display=font_display,
+                    font_dir=font_dir,
                 )
             )
     return blocks
 
 
 def write_css(entries: list[tuple[Variant, tuple[int, int]]]) -> list[Path]:
-    """Emit the combined stylesheet plus one per punctuation standard.
+    """Emit, for every font-display mode, a combined stylesheet plus one per
+    punctuation standard.
 
-    `diantenjeom.css` carries every variant; `{punct}.css` (jis / moe / gb /
-    kv) carries only that standard's faces, for callers who need a single
-    convention and don't want to ship the others' @font-face rules. The
-    weight-range map is built from the *full* entry list so a per-file
-    delegated face can still resolve its donor's font-weight range even when
-    the donor lives in another standard's group.
+    Layout (swap = default at the dist/ root; block/optional under subdirs):
+
+        dist/diantenjeom.css          dist/{jis,moe,gb,kv}.css          swap
+        dist/block/diantenjeom.css    dist/block/{jis,moe,gb,kv}.css    block
+        dist/optional/diantenjeom.css dist/optional/{jis,moe,gb,kv}.css optional
+
+    `diantenjeom.css` carries every variant; `{punct}.css` carries only that
+    standard's faces, for callers who need a single convention and don't want
+    to ship the others' @font-face rules. The weight-range map is built from
+    the *full* entry list so a per-file delegated face can still resolve its
+    donor's font-weight range even when the donor lives in another standard's
+    group. Root files reference ./fonts/; subdir files reach up to ../fonts/.
     """
     weight_by_stem = {v.stem: wr for v, wr in entries}
-
-    def _emit(path: Path, group: list[tuple[Variant, tuple[int, int]]]) -> Path:
-        path.write_text(
-            "\n\n".join(_css_blocks(group, weight_by_stem)) + "\n",
-            encoding="utf-8",
-        )
-        return path
-
-    written = [_emit(DIST / "diantenjeom.css", entries)]
 
     by_punct: dict[str, list[tuple[Variant, tuple[int, int]]]] = {}
     for entry in entries:
         by_punct.setdefault(entry[0].punct, []).append(entry)
-    for punct, group in by_punct.items():
-        written.append(_emit(DIST / f"{punct}.css", group))
+
+    written: list[Path] = []
+    for display in FONT_DISPLAYS:
+        out_dir = DIST if display == "swap" else DIST / display
+        out_dir.mkdir(parents=True, exist_ok=True)
+        font_dir = "./fonts/" if display == "swap" else "../fonts/"
+        groups: list[tuple[str, list[tuple[Variant, tuple[int, int]]]]] = [
+            ("diantenjeom.css", entries),
+            *((f"{punct}.css", group) for punct, group in by_punct.items()),
+        ]
+        for name, group in groups:
+            path = out_dir / name
+            path.write_text(
+                "\n\n".join(
+                    _css_blocks(
+                        group,
+                        weight_by_stem,
+                        font_display=display,
+                        font_dir=font_dir,
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            written.append(path)
 
     return written
 

@@ -3,7 +3,7 @@
 [project]
 name = "diantenjeom-build"
 version = "0.0.0"
-description = "Internal build scripts for diantenjeom. Not published; use the NPM package @han.css/diantenjeom instead."
+description = "Internal build scripts for diantenjeom. Not published; use the NPM package @hanzi.pro/diantenjeom instead."
 requires-python = ">=3.10"
 dependencies = [
     "fonttools[woff]>=4.55",

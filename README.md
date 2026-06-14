@@ -62,19 +62,19 @@ reuses the JP design with `：` kept upright, and is meant for vertical contexts
 Install:
 
 ```sh
-npm install @han.css/diantenjeom
+npm install @hanzi.pro/diantenjeom
 ```
 
 Load the stylesheet — it ships the `@font-face` blocks:
 
 ```css
-@import "@han.css/diantenjeom/css";
+@import "@hanzi.pro/diantenjeom/css";
 ```
 
 or, with a bundler:
 
 ```js
-import "@han.css/diantenjeom";
+import "@hanzi.pro/diantenjeom";
 ```
 
 The default stylesheet ships every convention (JIS / MOE / GB / KV). If you
@@ -82,7 +82,21 @@ only need one, import just that standard to skip the others' `@font-face`
 rules:
 
 ```css
-@import "@han.css/diantenjeom/moe"; /* also: /jis, /gb, /kv */
+@import "@hanzi.pro/diantenjeom/moe"; /* also: /jis, /gb, /kv */
+```
+
+The default uses `font-display: swap` — the host font's punctuation shows
+immediately, then swaps to Diantenjeom's positioning once the (tiny) font
+loads. The fallback glyph is fully legible, so the only cost is a brief
+in-em-box shift. If you'd rather have **no positional flash** (at the cost of
+briefly-invisible punctuation on a slow fetch), or a performance-first mode
+that applies the font **only if it loads near-instantly**, import the `block`
+or `optional` variant instead:
+
+```css
+@import "@hanzi.pro/diantenjeom/block";        /* block, every convention */
+@import "@hanzi.pro/diantenjeom/block/moe";    /* block, MOE only         */
+@import "@hanzi.pro/diantenjeom/optional/jis"; /* optional, JIS only      */
 ```
 
 Then put a Diantenjeom family **before** your CJK text font in the
@@ -112,6 +126,28 @@ Traditional Chinese, and so on.
 > `inline-flex` / `inline-grid`, as some frameworks emit when wrapping
 > characters — silently disables the squeeze; plain inline `<span>`s are fine.
 > See [docs/pair-squeeze-and-markup.md](docs/pair-squeeze-and-markup.md).
+
+### From a CDN (no install)
+
+jsDelivr and unpkg mirror every published file straight from npm — no install,
+no hosting. Point an `@import` or `<link>` at the file you want:
+
+```css
+@import "https://cdn.jsdelivr.net/npm/@hanzi.pro/diantenjeom@0.1.0/dist/diantenjeom.css";
+/* one convention:    …/dist/moe.css                                   */
+/* block / optional:  …/dist/block/moe.css   …/dist/optional/jis.css   */
+```
+
+```html
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@hanzi.pro/diantenjeom@0.1.0/dist/diantenjeom.css">
+```
+
+unpkg works identically — swap the host for `https://unpkg.com/`. The
+`@font-face` `src` paths are relative, so the woff2 files resolve against the
+same CDN automatically; you only ever reference the CSS. **Pin a version**
+(`@0.1.0`) in production so the CDN can cache the response immutably — an
+unpinned URL resolves to the latest release and is served with a short TTL.
 
 ### Without a build step
 

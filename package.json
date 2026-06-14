@@ -1,6 +1,6 @@
 {
-  "name": "@han.css/diantenjeom",
-  "version": "0.0.1",
+  "name": "@hanzi.pro/diantenjeom",
+  "version": "0.1.0-rc.0",
   "description": "Punctuation-only CJK fonts, per locale. Drop into a font fallback chain.",
   "keywords": [
     "cjk",
@@ -29,6 +29,16 @@
     "./moe": "./dist/moe.css",
     "./gb": "./dist/gb.css",
     "./kv": "./dist/kv.css",
+    "./block": "./dist/block/diantenjeom.css",
+    "./block/jis": "./dist/block/jis.css",
+    "./block/moe": "./dist/block/moe.css",
+    "./block/gb": "./dist/block/gb.css",
+    "./block/kv": "./dist/block/kv.css",
+    "./optional": "./dist/optional/diantenjeom.css",
+    "./optional/jis": "./dist/optional/jis.css",
+    "./optional/moe": "./dist/optional/moe.css",
+    "./optional/gb": "./dist/optional/gb.css",
+    "./optional/kv": "./dist/optional/kv.css",
     "./fonts/*": "./dist/fonts/*",
     "./package.json": "./package.json"
   },
