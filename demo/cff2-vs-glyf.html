@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>CFF2 vs glyf — diantenjeom ink comparison</title>
+<style>
+  :root {
+    --noto-glyf: "Noto Sans TC", sans-serif;
+    --dtjx-body: "Diantenjeom Sans JIS", "Noto Sans TC", sans-serif;
+    --size-body: 20px;
+    --size-large: 48px;
+  }
+
+  /* Load glyf Noto from local file */
+  @font-face {
+    font-family: "Noto Sans TC";
+    src: url("/tmp/noto-glyf/NotoSansTC-VF.ttf") format("truetype");
+    font-weight: 100 900;
+    font-style: normal;
+  }
+
+  /* Load diantenjeom CFF2 — JIS variant for punctuation */
+  @font-face {
+    font-family: "Diantenjeom Sans JIS";
+    src: url("../dist/fonts/diantenjeom-sans-jis.woff2") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+    unicode-range:
+      U+3001-3002, U+FF0C, U+FF0E, U+3041-3042, U+300C-300F,
+      U+FF08-FF09, U+3010-3011, U+FF3B-FF3D, U+FF5B-FF5D,
+      U+2018-2019, U+201C-201D, U+2014, U+2026, U+30FB,
+      U+FF01, U+FF1A-FF1B, U+FF1F, U+FE10-FE12;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--noto-glyf);
+    font-size: var(--size-body);
+    font-weight: 400;
+    background: #fff;
+    color: #000;
+    padding: 2rem;
+    line-height: 1.8;
+  }
+
+  h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 1.5rem; }
+  h2 { font-size: 0.9rem; font-weight: 600; color: #555; margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #ddd; }
+  p.note { font-size: 0.8rem; color: #888; margin: 0.3rem 0 0.8rem; font-family: monospace; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+  }
+  .label {
+    font-size: 0.75rem;
+    color: #888;
+    font-family: monospace;
+  }
+  .sample {
+    font-size: var(--size-body);
+    letter-spacing: 0;
+    text-spacing-trim: trim-all;
+  }
+  .sample.large { font-size: var(--size-large); }
+  .sample.glyf  { font-family: var(--noto-glyf); }
+  .sample.dtjx  { font-family: var(--dtjx-body); }
+
+  /* Isolated character grid for close inspection */
+  .char-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0 1rem;
+  }
+  .char-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+  }
+  .char-cell .glyph {
+    font-size: var(--size-large);
+    line-height: 1;
+    width: 2.5rem;
+    text-align: center;
+  }
+  .char-cell .caption {
+    font-size: 0.6rem;
+    color: #aaa;
+    font-family: monospace;
+  }
+  .char-cell .glyph.glyf { font-family: var(--noto-glyf); }
+  .char-cell .glyph.dtjx { font-family: var(--dtjx-body); }
+
+  /* Ink measurement targets — white-on-white, used by the script */
+  .measure { position: fixed; top: -9999px; left: -9999px; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<h1>CFF2 (diantenjeom) vs glyf (Noto Sans TC) — ink weight comparison</h1>
+<p class="note">Rendered at body 20px and large 48px. text-spacing-trim: trim-all applied.</p>
+
+<h2>Body size (20px) — mixed text with punctuation</h2>
+<p class="note">glyf = pure Noto Sans TC (glyf/gvar) | dtjx = Diantenjeom JIS CFF2 + Noto body</p>
+
+<div class="row">
+  <span class="label">glyf only</span>
+  <span class="sample glyf">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
+</div>
+<div class="row">
+  <span class="label">dtjx + glyf</span>
+  <span class="sample dtjx">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
+</div>
+
+<div class="row">
+  <span class="label">glyf only</span>
+  <span class="sample glyf">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
+</div>
+<div class="row">
+  <span class="label">dtjx + glyf</span>
+  <span class="sample dtjx">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
+</div>
+
+<div class="row">
+  <span class="label">glyf only</span>
+  <span class="sample glyf">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
+</div>
+<div class="row">
+  <span class="label">dtjx + glyf</span>
+  <span class="sample dtjx">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
+</div>
+
+<h2>Large size (48px) — punctuation shapes clearly visible</h2>
+
+<div class="row">
+  <span class="label">glyf only</span>
+  <span class="sample large glyf">「……」（）、。！？</span>
+</div>
+<div class="row">
+  <span class="label">dtjx + glyf</span>
+  <span class="sample large dtjx">「……」（）、。！？</span>
+</div>
+
+<div class="row">
+  <span class="label">glyf only</span>
+  <span class="sample large glyf">『—— 』〔　〕【　】</span>
+</div>
+<div class="row">
+  <span class="label">dtjx + glyf</span>
+  <span class="sample large dtjx">『—— 』〔　〕【　】</span>
+</div>
+
+<h2>Weight axis — glyf (top) vs dtjx (bottom) at wght 100, 400, 700, 900</h2>
+
+<div class="char-grid" id="weight-grid">
+  <!-- injected by script below -->
+</div>
+
+<h2>Isolated character comparison (48px)</h2>
+<p class="note">Each character: top = glyf Noto, bottom = diantenjeom CFF2</p>
+
+<div class="char-grid" id="char-compare">
+  <!-- injected by script below -->
+</div>
+
+<!-- Measurement targets for headless Chrome -->
+<div class="measure" id="measure-glyf" style="font-family: var(--noto-glyf); font-size: 48px; font-weight: 400;">「」（）、。！？……——</div>
+<div class="measure" id="measure-dtjx" style="font-family: var(--dtjx-body); font-size: 48px; font-weight: 400;">「」（）、。！？……——</div>
+
+<script type="module">
+const PUNCT = ['「', '」', '（', '）', '、', '。', '！', '？', '…', '—', '『', '』', '〔', '〕', '【', '】'];
+const WEIGHTS = [100, 300, 400, 700, 900];
+const GLYF_FAMILY = 'var(--noto-glyf)';
+const DTJX_FAMILY = 'var(--dtjx-body)';
+
+// Build isolated character comparison grid
+const charGrid = document.getElementById('char-compare');
+for (const ch of PUNCT) {
+  const cell = document.createElement('div');
+  cell.className = 'char-cell';
+  cell.innerHTML = `
+    <span class="glyph glyf">${ch}</span>
+    <span class="glyph dtjx">${ch}</span>
+    <span class="caption">U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4,'0')}</span>
+  `;
+  charGrid.appendChild(cell);
+}
+
+// Build weight comparison grid
+const weightGrid = document.getElementById('weight-grid');
+for (const wt of WEIGHTS) {
+  for (const [cls, label] of [['glyf', 'glyf'], ['dtjx', 'dtjx']]) {
+    const cell = document.createElement('div');
+    cell.className = 'char-cell';
+    cell.innerHTML = `
+      <span class="glyph ${cls}" style="font-weight:${wt}">「」（）。</span>
+      <span class="caption">${label} w${wt}</span>
+    `;
+    weightGrid.appendChild(cell);
+  }
+}
+
+// Ink measurement via canvas — runs in headless Chrome
+// Exposed as window.measureInk for the Python driver
+window.measureInk = async () => {
+  await document.fonts.ready;
+  const results = {};
+  for (const [id, family, label] of [
+    ['measure-glyf', getComputedStyle(document.documentElement).getPropertyValue('--noto-glyf').trim(), 'glyf'],
+    ['measure-dtjx', getComputedStyle(document.documentElement).getPropertyValue('--dtjx-body').trim(), 'dtjx'],
+  ]) {
+    const el = document.getElementById(id);
+    const text = el.textContent.trim();
+    const size = 48;
+    const canvas = document.createElement('canvas');
+    canvas.width = 800; canvas.height = size * 2;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = `${size}px ${el.style.fontFamily}`;
+    ctx.fillText(text, 0, size);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let dark = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 128) dark++;
+    }
+    results[label] = { dark, total: canvas.width * canvas.height, text };
+  }
+  return results;
+};
+</script>
+</body>
+</html>

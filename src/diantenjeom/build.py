@@ -34,6 +34,7 @@ from diantenjeom import (
     middle_dot,
     pin_locale,
     rotate_quotes,
+    to_glyf,
     vert_nudge,
     vert_subst,
 )
@@ -406,6 +407,11 @@ def subset_one(variant: Variant) -> tuple[list[Path], tuple[int, int]]:
     font["OS/2"].recalcUnicodeRanges(font)
 
     _rename_family(font, variant.family)
+
+    # Convert CFF2 outlines → glyf+gvar so Chrome uses its native rasteriser
+    # instead of FreeType (which renders CFF2 ~1.5× thinner on macOS/Windows).
+    # Done AFTER all surgery because surgery modules write CFF2 charstrings.
+    to_glyf.cff2_to_glyf(font)
 
     FONTS_OUT.mkdir(parents=True, exist_ok=True)
 

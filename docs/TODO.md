@@ -87,6 +87,20 @@
   ignore the outline of the glyph they're rendering. See
   `docs/vertical-text.md` § "Dash alignment" → "Update (2026-05-14)".
 
+## CFF2 → glyf conversion (2026-06-17)
+
+- **GB ：/；lose right-side squeeze in glyf path.** After the CFF2→glyf
+  conversion, `gb/sans/h` and `gb/serif/h` no longer squeeze ：/；pairs
+  such as `：〉`, `：）`, `：，`. Root cause: Chrome's CoreText/DirectWrite
+  glyph-type detection (in `han_kerning.cc`) differs from FreeType for
+  left-aligned glyphs. GB ：(xMin≈194) is SC-sourced and left-aligned;
+  JIS ：(xMin≈394) has `center_punct` applied so it's centred — Chrome
+  squeezes centred ：but not left-aligned ：in the native path. Applying
+  `center_punct` to GB ：would visually move the ink to centre, which
+  contradicts GB/mainland style. Net outcome: gb/sans/h went from 804 →
+  900 (+96, from curly quotes now squeezing), gb/serif/h went 804 → 760
+  (-44). Deferred; slight-bracket is the lesser evil (see plan).
+
 ## Tooling / CI (added 2026-06-14)
 
 - ~~**Wire the pair-squeeze regression into CI.**~~ ✅ Done 2026-06-14:
