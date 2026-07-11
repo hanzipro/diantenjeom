@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>og:image harness — screenshot at 1200×630, not deployed content</title>
+  <link rel="stylesheet" href="diantenjeom.css">
+  <style>
+    /* one-shot artwork: fixed canvas, physical properties fine here */
+    * { margin: 0; box-sizing: border-box; }
+    body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background: #fff;
+      color: #191515;
+      font-family: 'Avenir Next', 'Helvetica Neue', sans-serif;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 56px 72px 60px;
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 24px;
+      border-bottom: 6px solid #b00404;
+      padding-bottom: 24px;
+    }
+    .wordmark { font-size: 44px; font-weight: 600; letter-spacing: -.01em; }
+    .tagline { font-size: 26px; color: #555; }
+    .sub { margin-left: auto; font-size: 24px; color: #888; }
+    main {
+      align-self: center;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 32px;
+    }
+    figure { display: grid; gap: 14px; justify-items: center; }
+    .em {
+      width: 200px;
+      height: 200px;
+      border: 2px dashed #c9c9c9;
+      display: grid;
+      place-items: center;
+      font-size: 200px;
+      line-height: 1;
+      font-weight: 400;
+    }
+    .jis .em { font-family: 'Diantenjeom Serif JIS', serif; }
+    .moe .em { font-family: 'Diantenjeom Serif MOE', serif; }
+    .gb  .em { font-family: 'Diantenjeom Serif GB', serif; }
+    .kv  .em { font-family: 'Diantenjeom Serif KV', serif; }
+    figcaption { font-size: 26px; font-weight: 600; }
+    figcaption small { color: #888; font-weight: 400; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="wordmark">diantenjeom</span>
+    <span class="tagline">punctuation-only CJK fonts, per locale</span>
+    <span class="sub">點・てん・점</span>
+  </header>
+  <main>
+    <figure class="jis"><div class="em">。</div><figcaption>JIS<small>corner</small></figcaption></figure>
+    <figure class="moe"><div class="em">。</div><figcaption>MOE<small>centred</small></figcaption></figure>
+    <figure class="gb"><div class="em">。</div><figcaption>GB<small>corner</small></figcaption></figure>
+    <figure class="kv"><div class="em">。</div><figcaption>KV<small>corner</small></figcaption></figure>
+  </main>
+</body>
+</html>

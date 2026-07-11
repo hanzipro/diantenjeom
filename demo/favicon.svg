@@ -1,0 +1,8 @@
+<!-- diantenjeom favicon — an ideographic full stop 。 sitting in the CORNER of
+     its em square: punctuation POSITIONING is the whole product, and a hollow
+     ring has no glyph anatomy to get wrong. Same geometry language as the
+     sibling hanzi.pro marks (ink plate #191515, paper #f7f7f7). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="18" fill="#191515"/>
+  <circle cx="34" cy="66" r="17" fill="none" stroke="#f7f7f7" stroke-width="11"/>
+</svg>

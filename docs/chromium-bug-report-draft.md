@@ -182,4 +182,4 @@ entire trim feature application in
 [csswg-8293]: https://github.com/w3c/csswg-drafts/issues/8293
 [csswg-9504]: https://github.com/w3c/csswg-drafts/issues/9504
 [i2s]: https://groups.google.com/a/chromium.org/g/blink-dev/c/jVUR2ebE3e0
-[diantenjeom-repo]: https://github.com/han-css/diantenjeom
+[diantenjeom-repo]: https://github.com/hanzipro/diantenjeom

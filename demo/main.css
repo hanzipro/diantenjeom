@@ -405,3 +405,9 @@ html::-webkit-scrollbar {
     }
   }
 }
+/* landing intro under the h1 — what this page/project is, for first-time visitors */
+.intro {
+  max-width: 46em;
+  line-height: 1.6;
+  color: #444;
+}
