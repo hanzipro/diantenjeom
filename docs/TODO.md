@@ -1,5 +1,16 @@
 # TODO
 
+- **🚨 BLOCKER（glyf 路徑）：CFF2→glyf 轉換丟失 per-locale 的 x 位移——MOE
+  「。、，」等失去水平居中。** rc.0（CFF2）的 uni3002 墨界 x 361..640（中心
+  .50em）；glyf 轉換後變 43..322（中心 .18em），手術加的 +318 位移消失。
+  RecordingPen 抄寫 instantiated CFF2 時就已是 43..322，故損失發生在
+  TTGlyphPen 之前——嫌疑：instantiateVariableFont／FDArray FontMatrix 的
+  處理，或 MOE 位移實際儲存的位置不在裸 charstring 座標裡。2026-07-12 由
+  og:image 渲染發現。MOE／GB 所有帶 x 位移的字符都可疑；下方 07-11 的
+  LSB-sync 量測筆記是對著已污染的座標做的，修復後需重測。
+  期間 demo/fonts 與 og.png 已改釘發布版 rc.0（CFF2）工件——修復前
+  **不要**從 dist/ 重新整理它們。
+
 - **File the Chromium bug.** `docs/chromium-bug-report-draft.md` has a
   ready-to-paste draft. Findings to land:
   - `text-spacing-trim` is **not** a Noto-fingerprint check. It's

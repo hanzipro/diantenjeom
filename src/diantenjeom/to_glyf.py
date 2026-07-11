@@ -234,6 +234,11 @@ def cff2_to_glyf(font: TTFont) -> None:
     font["loca"] = loca
     font["gvar"] = gvar_table
 
+    # The container must follow the outlines: 'OTTO' declares CFF/CFF2, and a
+    # glyf font wearing it crashes FreeType outright (Android!) and fails OTS.
+    # 0x00010000 is the TrueType-outline sfntVersion.
+    font.sfntVersion = "\x00\x01\x00\x00"
+
     # head.indexToLocFormat: 0 = short (<=0xFFFF bytes), 1 = long.
     # With ~140 glyphs the table is small; fontTools picks the right value
     # on save, so just set a safe default.
