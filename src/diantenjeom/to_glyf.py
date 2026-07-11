@@ -239,6 +239,18 @@ def cff2_to_glyf(font: TTFont) -> None:
     # 0x00010000 is the TrueType-outline sfntVersion.
     font.sfntVersion = "\x00\x01\x00\x00"
 
+    # TrueType rasterisers expect a prep program enabling smart dropout
+    # control (mode 4) — another concept CFF never had. This is the standard
+    # gftools fix-nonhinting stub.
+    from fontTools.ttLib.tables import ttProgram
+
+    prep = newTable("prep")
+    prep.program = ttProgram.Program()
+    prep.program.fromAssembly(
+        ["PUSHW[]", "511", "SCANCTRL[]", "PUSHB[]", "4", "SCANTYPE[]"]
+    )
+    font["prep"] = prep
+
     # head.indexToLocFormat: 0 = short (<=0xFFFF bytes), 1 = long.
     # With ~140 glyphs the table is small; fontTools picks the right value
     # on save, so just set a safe default.
