@@ -28,12 +28,14 @@
   #nav a { margin-right: .35rem; text-decoration: none; padding: 1px 6px; border: 1px solid #ccc; border-radius: 4px; color: #333; }
   #nav a.cur { background: #222; color: #fff; border-color: #222; }
 
-  /* Every squeezing pair, rendered as shipped (font + trim + writing-mode). */
-  #grid { display: flex; flex-wrap: wrap; gap: .4rem; padding: 1rem; }
-  #grid .cell { border: 1px solid #eee; border-radius: 5px; padding: .25rem .4rem; display: flex; flex-direction: column; align-items: center; }
-  #grid .pair { font-size: 34px; text-spacing-trim: trim-start; line-height: 1.2; }
-  #grid.vert .pair { writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; }
-  #grid .amt { font: 10px ui-monospace, monospace; color: #aaa; margin-top: 2px; }
+  /* Pair grids — squeezed and not-squeezed. */
+  .grid-label { font: 12px ui-monospace, monospace; color: #888; padding: .5rem 1rem .2rem; }
+  #grid, #grid-no { display: flex; flex-wrap: wrap; gap: .4rem; padding: .5rem 1rem 1rem; }
+  #grid .cell, #grid-no .cell { border: 1px solid #eee; border-radius: 5px; padding: .25rem .4rem; display: flex; flex-direction: column; align-items: center; }
+  #grid-no .cell { border-color: #f5e0e0; background: #fffafa; }
+  #grid .pair, #grid-no .pair { font-size: 34px; text-spacing-trim: space-first; line-height: 1.2; }
+  #grid.vert .pair, #grid-no.vert .pair { writing-mode: vertical-rl; -webkit-writing-mode: vertical-rl; }
+  #grid .amt, #grid-no .amt { font: 10px ui-monospace, monospace; color: #aaa; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -41,7 +43,10 @@
 <div id="stage"></div>
 <div id="status">measuring…</div>
 <pre id="RESULT"></pre>
+<div class="grid-label" id="label-yes" style="display:none"></div>
 <div id="grid"></div>
+<div class="grid-label" id="label-no" style="display:none"></div>
+<div id="grid-no"></div>
 
 <script>
   const EM = 100;
@@ -150,12 +155,24 @@
       `font loaded: ${result.meta.font_loaded}\n` +
       `pairs tested: ${tested} · squeezed: ${result.meta.pairs_squeezed}`;
 
-    // Render every squeezing pair as shipped, so the result is eyeball-able.
+    // Build a set of all non-squeezing pairs (excluding same-char control pairs).
+    const noSqueeze = {};
+    for (const a of CHARS) {
+      for (const b of CHARS) {
+        const pair = a + b;
+        if (!squeeze[pair]) noSqueeze[pair] = 0;
+      }
+    }
+
+    // Render squeezing pairs.
     const grid = document.getElementById("grid");
     grid.style.fontFamily = `'${FAMILY}', ${FALLBACK}`;
     if (dir === "v") grid.classList.add("vert");
     const entries = Object.entries(squeeze)
       .sort((x, y) => (y[1] - x[1]) || x[0].localeCompare(y[0]));
+    document.getElementById("label-yes").style.display = "";
+    document.getElementById("label-yes").textContent =
+      `Squeezing — ${entries.length} pairs`;
     for (const [pair, amt] of entries) {
       const cell = document.createElement("div");
       cell.className = "cell";
@@ -168,6 +185,135 @@
       cell.append(p, a);
       grid.appendChild(cell);
     }
+
+    // Render non-squeezing pairs.
+    const gridNo = document.getElementById("grid-no");
+    gridNo.style.fontFamily = `'${FAMILY}', ${FALLBACK}`;
+    if (dir === "v") gridNo.classList.add("vert");
+    const noEntries = Object.keys(noSqueeze).sort((a, b) => a.localeCompare(b));
+    document.getElementById("label-no").style.display = "";
+    document.getElementById("label-no").textContent =
+      `Not squeezing — ${noEntries.length} pairs`;
+    for (const pair of noEntries) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const p = document.createElement("span");
+      p.className = "pair";
+      p.textContent = pair;
+      const a = document.createElement("span");
+      a.className = "amt";
+      a.textContent = "0";
+      cell.append(p, a);
+      gridNo.appendChild(cell);
+    }
+
+    // Cross-validate display rendering per character-class group.
+    // For each group: pick one representative squeezing pair and one non-squeezing
+    // pair, re-measure at the display font-size (34px), compare against the actual
+    // rendered .pair element in the respective grid.
+    //
+    // Result: "✓ all N passed" in status, or per-failing-check details in crimson.
+    (function assertDisplayGroups() {
+      const GROUPS = [
+        ["OPEN",   OPEN],
+        ["CLOSE",  CLOSE],
+        ["PERIOD", PERIOD],
+        ["COMMA",  COMMA],
+        ["COLON",  COLON],
+        ["BANG",   BANG],
+        ["MIDDOT", MIDDOT],
+        ["QUOTE",  QUOTE],
+      ];
+
+      const pairEls = new Map(
+        [...grid.querySelectorAll(".pair")].map(el => [el.textContent, el])
+      );
+      const noEls = new Map(
+        [...document.getElementById("grid-no").querySelectorAll(".pair")].map(el => [el.textContent, el])
+      );
+
+      function measure34natural(a, b) {
+        stage.style.fontSize = "34px";
+        const n = extent(a, b, false);
+        const t = extent(a, b, true);
+        stage.style.fontSize = "";
+        return { n, t };
+      }
+
+      function displayedSize(el) {
+        const r = el.getBoundingClientRect();
+        return dir === "v" ? r.height : r.width;
+      }
+
+      // sq check: displayed must be closer to t (trimmed) than n (natural).
+      // Skip if signal n-t < 0.5px — too small to distinguish at 34px.
+      function checkSq(pair, pairEl) {
+        const [a, b] = [...pair];
+        const { n, t } = measure34natural(a, b);
+        if (n - t < 0.5) return { skip: true };
+        const displayed = displayedSize(pairEl);
+        const ok = Math.abs(displayed - t) <= Math.abs(displayed - n);
+        return { ok, skip: false, pair, expectSqueeze: true, n, t, displayed };
+      }
+
+      // no-sq check: displayed must not be meaningfully smaller than natural.
+      // Uses only n (natural baseline); t is irrelevant (≈ n for these pairs).
+      // Fail if natural - displayed > 0.5px (i.e., display is squeezing when it shouldn't).
+      function checkNoSq(pair, pairEl) {
+        const [a, b] = [...pair];
+        stage.style.fontSize = "34px";
+        const n = extent(a, b, false);
+        stage.style.fontSize = "";
+        const displayed = displayedSize(pairEl);
+        const ok = n - displayed <= 0.5;
+        return { ok, skip: false, pair, expectSqueeze: false, n, t: null, displayed };
+      }
+
+      const results = [];
+      for (const [name, group] of GROUPS) {
+        const sqEntry = entries.find(([p]) => group.includes(p[0]) || group.includes(p[1]));
+        if (sqEntry && pairEls.has(sqEntry[0]))
+          results.push({ name, ...checkSq(sqEntry[0], pairEls.get(sqEntry[0])) });
+
+        // Exclude CONTROL chars (—, …, ／, ●, 永) from no-sq selection:
+        // they sort early in Unicode so they'd dominate every group, and
+        // their mid-line probe context doesn't match the display's line-start context.
+        const noKey = noEntries.find(p =>
+          (group.includes(p[0]) || group.includes(p[1])) &&
+          !CONTROL.includes(p[0]) && !CONTROL.includes(p[1])
+        );
+        if (noKey && noEls.has(noKey))
+          results.push({ name, ...checkNoSq(noKey, noEls.get(noKey)) });
+      }
+
+      const checked = results.filter(r => !r.skip);
+      const failed  = checked.filter(r => !r.ok);
+      const statusEl = document.getElementById("status");
+
+      if (failed.length === 0) {
+        const passList = checked.map(r =>
+          `  ✓ ${r.name.padEnd(7)} ${r.pair}  ${r.expectSqueeze ? "sq" : "no-sq"}`
+        ).join("\n");
+        statusEl.textContent +=
+          `\n\ndisplay validation · ${checked.length} checks · all passed ✓\n` + passList;
+      } else {
+        const header =
+          `display validation · ${checked.length} checks · ${failed.length} FAILED ⛔`;
+        const detail = failed.map(r => {
+          const kind = r.expectSqueeze ? "sq" : "no-sq";
+          const nums = r.expectSqueeze
+            ? `nat=${r.n.toFixed(1)} trim=${r.t.toFixed(1)} disp=${r.displayed.toFixed(1)}`
+            : `nat=${r.n.toFixed(1)} disp=${r.displayed.toFixed(1)}`;
+          const verdict = r.expectSqueeze
+            ? "displayed ≈ natural (not squeezed)"
+            : "displayed < natural (unexpectedly squeezed)";
+          return `  ✗ ${r.name.padEnd(7)} ${r.pair}  ${kind}  ${nums}  ← ${verdict} (check space-first on #grid .pair)`;
+        });
+        statusEl.style.color = "crimson";
+        statusEl.textContent += "\n\n" + [header, ...detail].join("\n");
+        console.error("assertDisplayGroups:\n" + [header, ...detail].join("\n"));
+      }
+    })();
 
     document.title = "DONE " + document.title;
   })();

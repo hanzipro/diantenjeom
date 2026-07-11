@@ -4,236 +4,258 @@
 <meta charset="utf-8">
 <title>CFF2 vs glyf — diantenjeom ink comparison</title>
 <style>
-  :root {
-    --noto-glyf: "Noto Sans TC", sans-serif;
-    --dtjx-body: "Diantenjeom Sans JIS", "Noto Sans TC", sans-serif;
-    --size-body: 20px;
-    --size-large: 48px;
-  }
+/* ── Fonts ─────────────────────────────────────────────────── */
+@font-face {
+  font-family: "NotoGlyf";
+  src: url("/tmp/noto-glyf/NotoSansTC-VF.ttf") format("truetype");
+  font-weight: 100 900;
+}
+/* dtjx CFF2 (old): full unicode-range override so it wins over NotoGlyf body */
+@font-face {
+  font-family: "DtjxCFF2";
+  src: url("fonts/dtjx-cff2-jis.woff2") format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0000-FFFF;
+}
+/* dtjx glyf (new) */
+@font-face {
+  font-family: "DtjxGlyf";
+  src: url("fonts/dtjx-glyf-jis.woff2") format("woff2");
+  font-weight: 100 900;
+  unicode-range: U+0000-FFFF;
+}
 
-  /* Load glyf Noto from local file */
-  @font-face {
-    font-family: "Noto Sans TC";
-    src: url("/tmp/noto-glyf/NotoSansTC-VF.ttf") format("truetype");
-    font-weight: 100 900;
-    font-style: normal;
-  }
+/* ── Layout ─────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "NotoGlyf", sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  padding: 2rem 3rem;
+  max-width: 1100px;
+  background: #fff;
+  color: #111;
+}
 
-  /* Load diantenjeom CFF2 — JIS variant for punctuation */
-  @font-face {
-    font-family: "Diantenjeom Sans JIS";
-    src: url("../dist/fonts/diantenjeom-sans-jis.woff2") format("woff2");
-    font-weight: 100 900;
-    font-style: normal;
-    unicode-range:
-      U+3001-3002, U+FF0C, U+FF0E, U+3041-3042, U+300C-300F,
-      U+FF08-FF09, U+3010-3011, U+FF3B-FF3D, U+FF5B-FF5D,
-      U+2018-2019, U+201C-201D, U+2014, U+2026, U+30FB,
-      U+FF01, U+FF1A-FF1B, U+FF1F, U+FE10-FE12;
-  }
+h1 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.5rem; }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+section { margin-bottom: 2.5rem; }
+h2 {
+  font-size: 0.8rem; font-weight: 700; color: #555;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.25rem; margin-bottom: 0.75rem;
+}
+p.note { font-size: 0.72rem; color: #999; font-family: monospace; margin-bottom: 0.5rem; }
 
-  body {
-    font-family: var(--noto-glyf);
-    font-size: var(--size-body);
-    font-weight: 400;
-    background: #fff;
-    color: #000;
-    padding: 2rem;
-    line-height: 1.8;
-  }
+/* ── Comparison rows ─────────────────────────────────────────── */
+.rows { display: flex; flex-direction: column; gap: 0.2rem; }
+.row  { display: grid; grid-template-columns: 9rem 1fr; align-items: baseline; gap: 0.75rem; }
+.lbl  { font-size: 0.72rem; color: #888; font-family: monospace; white-space: nowrap; }
 
-  h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 1.5rem; }
-  h2 { font-size: 0.9rem; font-weight: 600; color: #555; margin: 1.5rem 0 0.5rem; border-bottom: 1px solid #ddd; }
-  p.note { font-size: 0.8rem; color: #888; margin: 0.3rem 0 0.8rem; font-family: monospace; }
+.sample {
+  font-size: 20px;
+  line-height: 1.5;
+  text-spacing-trim: trim-all;
+  letter-spacing: 0;
+}
+.sample.large { font-size: 48px; line-height: 1.2; }
 
-  .row {
-    display: grid;
-    grid-template-columns: 10rem 1fr;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 0.6rem;
-  }
-  .label {
-    font-size: 0.75rem;
-    color: #888;
-    font-family: monospace;
-  }
-  .sample {
-    font-size: var(--size-body);
-    letter-spacing: 0;
-    text-spacing-trim: trim-all;
-  }
-  .sample.large { font-size: var(--size-large); }
-  .sample.glyf  { font-family: var(--noto-glyf); }
-  .sample.dtjx  { font-family: var(--dtjx-body); }
+/* font-family assignments */
+.noto  { font-family: "NotoGlyf",  sans-serif; }
+.cff2  { font-family: "DtjxCFF2", "NotoGlyf", sans-serif; }
+.glyf_ { font-family: "DtjxGlyf", "NotoGlyf", sans-serif; }
 
-  /* Isolated character grid for close inspection */
-  .char-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 0.5rem 0 1rem;
-  }
-  .char-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-  }
-  .char-cell .glyph {
-    font-size: var(--size-large);
-    line-height: 1;
-    width: 2.5rem;
-    text-align: center;
-  }
-  .char-cell .caption {
-    font-size: 0.6rem;
-    color: #aaa;
-    font-family: monospace;
-  }
-  .char-cell .glyph.glyf { font-family: var(--noto-glyf); }
-  .char-cell .glyph.dtjx { font-family: var(--dtjx-body); }
+/* ── Weight grid ─────────────────────────────────────────────── */
+.wgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+}
+.wcell {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 0.4rem 0.25rem;
+  border: 1px solid #eee; border-radius: 4px;
+  background: #fafafa;
+}
+.wcell .wglyph { font-size: 36px; line-height: 1.1; letter-spacing: -0.05em; }
+.wcell .wcap   { font-size: 0.65rem; color: #aaa; font-family: monospace; text-align: center; }
 
-  /* Ink measurement targets — white-on-white, used by the script */
-  .measure { position: fixed; top: -9999px; left: -9999px; white-space: nowrap; }
+/* ── Isolated char grid ──────────────────────────────────────── */
+.cgrid {
+  display: flex; flex-wrap: wrap; gap: 0.75rem 0.5rem; margin-top: 0.5rem;
+}
+.ccell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.ccell .cglyph { font-size: 48px; line-height: 1; width: 2.8rem; text-align: center; }
+.ccell .ccap   { font-size: 0.62rem; color: #aaa; font-family: monospace; }
+
+/* Divider between glyph rows in cell */
+.ccell .divider { width: 100%; height: 1px; background: #e8e8e8; margin: 1px 0; }
+
+/* colour coding for quick scanning */
+.tag-noto  { color: #1a6fbf; }
+.tag-cff2  { color: #c0392b; }
+.tag-glyf_ { color: #27ae60; }
 </style>
 </head>
 <body>
 
-<h1>CFF2 (diantenjeom) vs glyf (Noto Sans TC) — ink weight comparison</h1>
-<p class="note">Rendered at body 20px and large 48px. text-spacing-trim: trim-all applied.</p>
+<h1>Diantenjeom: CFF2 (old) vs glyf (new) — ink weight & squeeze comparison</h1>
 
-<h2>Body size (20px) — mixed text with punctuation</h2>
-<p class="note">glyf = pure Noto Sans TC (glyf/gvar) | dtjx = Diantenjeom JIS CFF2 + Noto body</p>
+<!-- ── Section 1: Body text ───────────────────────────────────── -->
+<section>
+<h2>1. Body text at 20px, wght=400</h2>
+<p class="note">Three fonts in the same fallback role. All rows use Noto glyf for hanzi / kana.</p>
+<div class="rows">
 
-<div class="row">
-  <span class="label">glyf only</span>
-  <span class="sample glyf">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
-</div>
-<div class="row">
-  <span class="label">dtjx + glyf</span>
-  <span class="sample dtjx">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
-</div>
+  <div class="row">
+    <span class="lbl tag-noto">Noto (glyf) only</span>
+    <span class="sample noto">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2 + Noto</span>
+    <span class="sample cff2">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf + Noto</span>
+    <span class="sample glyf_">「今日は」と彼は言った。「天気が良いですね。」それは本当だった——空は青く、雲はなかった。</span>
+  </div>
 
-<div class="row">
-  <span class="label">glyf only</span>
-  <span class="sample glyf">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
-</div>
-<div class="row">
-  <span class="label">dtjx + glyf</span>
-  <span class="sample dtjx">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
-</div>
+  <div class="row" style="margin-top:.4rem">
+    <span class="lbl tag-noto">Noto (glyf) only</span>
+    <span class="sample noto">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2 + Noto</span>
+    <span class="sample cff2">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf + Noto</span>
+    <span class="sample glyf_">台灣是美麗的島嶼（福爾摩沙）。各地的風景——從北部的都市到南部的海邊——都令人嚮往。</span>
+  </div>
 
-<div class="row">
-  <span class="label">glyf only</span>
-  <span class="sample glyf">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
-</div>
-<div class="row">
-  <span class="label">dtjx + glyf</span>
-  <span class="sample dtjx">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
-</div>
+  <div class="row" style="margin-top:.4rem">
+    <span class="lbl tag-noto">Noto (glyf) only</span>
+    <span class="sample noto">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2 + Noto</span>
+    <span class="sample cff2">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf + Noto</span>
+    <span class="sample glyf_">她問：「你確定嗎？」他沉默了……然後點頭說：「確定。」</span>
+  </div>
 
-<h2>Large size (48px) — punctuation shapes clearly visible</h2>
-
-<div class="row">
-  <span class="label">glyf only</span>
-  <span class="sample large glyf">「……」（）、。！？</span>
 </div>
-<div class="row">
-  <span class="label">dtjx + glyf</span>
-  <span class="sample large dtjx">「……」（）、。！？</span>
+</section>
+
+<!-- ── Section 2: Large punctuation ───────────────────────────── -->
+<section>
+<h2>2. Punctuation at 48px, wght=400 — shape & weight comparison</h2>
+<p class="note">Same character string across all three; Noto glyf is the target reference weight.</p>
+<div class="rows">
+  <div class="row">
+    <span class="lbl tag-noto">Noto (glyf)</span>
+    <span class="sample large noto">「……」（）、。！？</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2</span>
+    <span class="sample large cff2">「……」（）、。！？</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf</span>
+    <span class="sample large glyf_">「……」（）、。！？</span>
+  </div>
+
+  <div class="row" style="margin-top:.5rem">
+    <span class="lbl tag-noto">Noto (glyf)</span>
+    <span class="sample large noto">『——』〔〕【】：；</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2</span>
+    <span class="sample large cff2">『——』〔〕【】：；</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf</span>
+    <span class="sample large glyf_">『——』〔〕【】：；</span>
+  </div>
 </div>
+</section>
 
-<div class="row">
-  <span class="label">glyf only</span>
-  <span class="sample large glyf">『—— 』〔　〕【　】</span>
+<!-- ── Section 3: Weight axis ─────────────────────────────────── -->
+<section>
+<h2>3. Weight axis — wght 100 / 400 / 700 / 900</h2>
+<p class="note">Each cell: Noto glyf (blue) / dtjx CFF2 (red) / dtjx glyf (green). Characters: 「」（）</p>
+<div class="wgrid" id="wgrid"></div>
+</section>
+
+<!-- ── Section 4: Character-by-character ──────────────────────── -->
+<section>
+<h2>4. Isolated characters at 48px — all three fonts</h2>
+<p class="note">Top = Noto glyf &nbsp;|&nbsp; Middle = dtjx CFF2 &nbsp;|&nbsp; Bottom = dtjx glyf</p>
+<div class="cgrid" id="cgrid"></div>
+</section>
+
+<!-- ── Section 5: Pair squeeze ───────────────────────────────────── -->
+<section>
+<h2>5. Pair-squeeze (text-spacing-trim: trim-all) at 20px</h2>
+<p class="note">Squeeze should fire identically for all three. CFF2 version was already OK for JIS.</p>
+<div class="rows">
+  <div class="row">
+    <span class="lbl tag-noto">Noto (glyf)</span>
+    <span class="sample noto" style="text-spacing-trim:trim-all">「文字」、「排版」——（括弧）、【文字】、《書名》、〔注釋〕</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-cff2">dtjx CFF2</span>
+    <span class="sample cff2" style="text-spacing-trim:trim-all">「文字」、「排版」——（括弧）、【文字】、《書名》、〔注釋〕</span>
+  </div>
+  <div class="row">
+    <span class="lbl tag-glyf_">dtjx glyf</span>
+    <span class="sample glyf_" style="text-spacing-trim:trim-all">「文字」、「排版」——（括弧）、【文字】、《書名》、〔注釋〕</span>
+  </div>
 </div>
-<div class="row">
-  <span class="label">dtjx + glyf</span>
-  <span class="sample large dtjx">『—— 』〔　〕【　】</span>
-</div>
-
-<h2>Weight axis — glyf (top) vs dtjx (bottom) at wght 100, 400, 700, 900</h2>
-
-<div class="char-grid" id="weight-grid">
-  <!-- injected by script below -->
-</div>
-
-<h2>Isolated character comparison (48px)</h2>
-<p class="note">Each character: top = glyf Noto, bottom = diantenjeom CFF2</p>
-
-<div class="char-grid" id="char-compare">
-  <!-- injected by script below -->
-</div>
-
-<!-- Measurement targets for headless Chrome -->
-<div class="measure" id="measure-glyf" style="font-family: var(--noto-glyf); font-size: 48px; font-weight: 400;">「」（）、。！？……——</div>
-<div class="measure" id="measure-dtjx" style="font-family: var(--dtjx-body); font-size: 48px; font-weight: 400;">「」（）、。！？……——</div>
+</section>
 
 <script type="module">
-const PUNCT = ['「', '」', '（', '）', '、', '。', '！', '？', '…', '—', '『', '』', '〔', '〕', '【', '】'];
-const WEIGHTS = [100, 300, 400, 700, 900];
-const GLYF_FAMILY = 'var(--noto-glyf)';
-const DTJX_FAMILY = 'var(--dtjx-body)';
+const PUNCT = ['「','」','（','）','、','。','！','？','…','—','『','』','〔','〕','【','】'];
+const WEIGHTS = [100, 400, 700, 900];
+const CHARS = '「」（）';  /* clean weight-demo string: just brackets */
 
-// Build isolated character comparison grid
-const charGrid = document.getElementById('char-compare');
-for (const ch of PUNCT) {
-  const cell = document.createElement('div');
-  cell.className = 'char-cell';
-  cell.innerHTML = `
-    <span class="glyph glyf">${ch}</span>
-    <span class="glyph dtjx">${ch}</span>
-    <span class="caption">U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4,'0')}</span>
-  `;
-  charGrid.appendChild(cell);
-}
-
-// Build weight comparison grid
-const weightGrid = document.getElementById('weight-grid');
+/* ── Weight grid ──────────────────────────────────────────── */
+const wgrid = document.getElementById('wgrid');
 for (const wt of WEIGHTS) {
-  for (const [cls, label] of [['glyf', 'glyf'], ['dtjx', 'dtjx']]) {
+  for (const [cls, tag, label] of [
+    ['noto',  'tag-noto',  'Noto glyf'],
+    ['cff2',  'tag-cff2',  'dtjx CFF2'],
+    ['glyf_', 'tag-glyf_', 'dtjx glyf'],
+  ]) {
     const cell = document.createElement('div');
-    cell.className = 'char-cell';
-    cell.innerHTML = `
-      <span class="glyph ${cls}" style="font-weight:${wt}">「」（）。</span>
-      <span class="caption">${label} w${wt}</span>
-    `;
-    weightGrid.appendChild(cell);
+    cell.className = 'wcell';
+    cell.innerHTML =
+      `<span class="wglyph ${cls}" style="font-weight:${wt}">${CHARS}</span>` +
+      `<span class="wcap ${tag}">${label} w${wt}</span>`;
+    wgrid.appendChild(cell);
   }
 }
 
-// Ink measurement via canvas — runs in headless Chrome
-// Exposed as window.measureInk for the Python driver
-window.measureInk = async () => {
-  await document.fonts.ready;
-  const results = {};
-  for (const [id, family, label] of [
-    ['measure-glyf', getComputedStyle(document.documentElement).getPropertyValue('--noto-glyf').trim(), 'glyf'],
-    ['measure-dtjx', getComputedStyle(document.documentElement).getPropertyValue('--dtjx-body').trim(), 'dtjx'],
-  ]) {
-    const el = document.getElementById(id);
-    const text = el.textContent.trim();
-    const size = 48;
-    const canvas = document.createElement('canvas');
-    canvas.width = 800; canvas.height = size * 2;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000';
-    ctx.font = `${size}px ${el.style.fontFamily}`;
-    ctx.fillText(text, 0, size);
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let dark = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] < 128) dark++;
-    }
-    results[label] = { dark, total: canvas.width * canvas.height, text };
-  }
-  return results;
-};
+/* ── Character grid ───────────────────────────────────────── */
+const cgrid = document.getElementById('cgrid');
+for (const ch of PUNCT) {
+  const cp = `U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4,'0')}`;
+  const cell = document.createElement('div');
+  cell.className = 'ccell';
+  cell.innerHTML =
+    `<span class="cglyph noto">${ch}</span>` +
+    `<div class="divider"></div>` +
+    `<span class="cglyph cff2">${ch}</span>` +
+    `<div class="divider"></div>` +
+    `<span class="cglyph glyf_">${ch}</span>` +
+    `<span class="ccap">${cp}</span>`;
+  cgrid.appendChild(cell);
+}
 </script>
 </body>
 </html>

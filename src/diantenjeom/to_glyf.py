@@ -126,7 +126,7 @@ def _build_gvar(
     glyphs_def: dict[str, "_glyf_mod.Glyph | None"],
     glyphs_max: dict[str, "_glyf_mod.Glyph | None"],
     hmtx: dict[str, tuple[int, int]],
-) -> "table__g_v_a_r":
+) -> object:
     from fontTools.ttLib.tables._g_v_a_r import table__g_v_a_r
 
     gvar = table__g_v_a_r()

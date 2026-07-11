@@ -8,7 +8,10 @@ Usage:
     python scripts/measure_cff2_glyf.py
 """
 from __future__ import annotations
-import json, subprocess, sys, tempfile
+import json
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 try:
@@ -32,7 +35,6 @@ def build_measure_html(char: str, weight: int = 400) -> str:
     """Return self-contained HTML that renders `char` in glyf vs dtjx."""
     noto_uri  = NOTO_TTF.as_uri()
     dtjx_uri  = DTJX_WOFF2.as_uri()
-    cp = f"U+{ord(char):04X}"
     return f"""<!doctype html>
 <html><head><meta charset="utf-8">
 <style>

@@ -23,6 +23,8 @@
     actual GitHub URL of this project. Target component:
     `Blink>Fonts>Shaping`.
 
+- **縱排彎引號不參與 pair-squeeze。** `rotate_quotes` 建的四個 vert 形（glyph00186-189）墨水都在 em 中央（ink center ≈ 38% from top），Chrome `CharTypeFromBounds` 無法分類為 open 或 close，故 `'〈` 等配對不擠壓。修法：vert 形需把開引號 ink 下移至 em 底（TSB ≈ 600–750，比照 `〈`），閉引號 ink 上移至 em 頂（TSB ≈ 50–200）。此為既有限制，非 glyf 轉換退化。
+
 - **MOE pair-squeeze drops `(Close, Open)` under `lang="ja"`.** Specifically
   `。「` (U+3002 + U+300C) doesn't squeeze under `lang="ja"`, but the same
   pair squeezes under `lang="zh-Hant" / "zh-Hans" / "ko"`. `。『`
@@ -100,6 +102,9 @@
   contradicts GB/mainland style. Net outcome: gb/sans/h went from 804 →
   900 (+96, from curly quotes now squeezing), gb/serif/h went 804 → 760
   (-44). Deferred; slight-bracket is the lesser evil (see plan).
+  Note: Chrome uses **hmtx LSB** (not glyf xMin) for horizontal
+  pair-squeeze classification; syncing LSB to xMin restored GB ：；squeeze
+  (+44 pairs) but cost MOE 。、，138 pairs — net worse, reverted.
 
 ## Tooling / CI (added 2026-06-14)
 
