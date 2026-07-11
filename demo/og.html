@@ -44,6 +44,10 @@
       font-size: 200px;
       line-height: 1;
       font-weight: 400;
+      /* Chrome's DEFAULT trims a line-leading fullwidth stop to half width,
+         dragging MOE's centred ink to the 25% mark — space-all is the true
+         untrimmed baseline (see docs/pair-squeeze-and-markup.md) */
+      text-spacing-trim: space-all;
     }
     .jis .em { font-family: 'Diantenjeom Serif JIS', serif; }
     .moe .em { font-family: 'Diantenjeom Serif MOE', serif; }
