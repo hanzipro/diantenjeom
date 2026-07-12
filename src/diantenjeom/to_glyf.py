@@ -234,6 +234,23 @@ def cff2_to_glyf(font: TTFont) -> None:
     font["loca"] = loca
     font["gvar"] = gvar_table
 
+    # Resync hmtx left-side-bearing to each glyph's xMin.
+    #
+    # CFF2 positions a glyph purely from its charstring coordinates and ignores
+    # hmtx.lsb, so upstream surgery (graft, center_punct, …) freely left the
+    # JP-base lsb in place — a deliberate pair-squeeze signal — while shifting
+    # the outline elsewhere.  glyf positioning is the opposite: the rasteriser
+    # seats the outline's xMin at `lsb` from the pen origin, so the spec
+    # *requires* lsb == xMin.  Carrying the stale lsb across the conversion
+    # renders every grafted/shifted glyph off by (xMin − lsb) — e.g. MOE's
+    # centred 。 slid 318 units back into the corner.  Sync lsb to the built
+    # (post-cu2qu) xMin; the advance width is unchanged.
+    hmtx = font["hmtx"].metrics
+    for gname, g in glyphs_def.items():
+        if g is not None and getattr(g, "numberOfContours", 0) > 0:
+            advance, _lsb = hmtx.get(gname, (0, 0))
+            hmtx[gname] = (advance, g.xMin)
+
     # The container must follow the outlines: 'OTTO' declares CFF/CFF2, and a
     # glyf font wearing it crashes FreeType outright (Android!) and fails OTS.
     # 0x00010000 is the TrueType-outline sfntVersion.

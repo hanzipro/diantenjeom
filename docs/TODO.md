@@ -1,15 +1,18 @@
 # TODO
 
-- **🚨 BLOCKER（glyf 路徑）：CFF2→glyf 轉換丟失 per-locale 的 x 位移——MOE
-  「。、，」等失去水平居中。** rc.0（CFF2）的 uni3002 墨界 x 361..640（中心
-  .50em）；glyf 轉換後變 43..322（中心 .18em），手術加的 +318 位移消失。
-  RecordingPen 抄寫 instantiated CFF2 時就已是 43..322，故損失發生在
-  TTGlyphPen 之前——嫌疑：instantiateVariableFont／FDArray FontMatrix 的
-  處理，或 MOE 位移實際儲存的位置不在裸 charstring 座標裡。2026-07-12 由
-  og:image 渲染發現。MOE／GB 所有帶 x 位移的字符都可疑；下方 07-11 的
-  LSB-sync 量測筆記是對著已污染的座標做的，修復後需重測。
-  期間 demo/fonts 與 og.png 已改釘發布版 rc.0（CFF2）工件——修復前
-  **不要**從 dist/ 重新整理它們。
+- ~~**🚨 BLOCKER（glyf 路徑）：CFF2→glyf 轉換丟失 per-locale 的 x 位移——MOE
+  「。、，」失去水平居中。**~~ ✅ 已解決 2026-07-12。**根因與舊推測相反**：glyf
+  的 outline 座標其實正確（uni3002 仍 361..640），錯的是 `hmtx.leftSideBearing`。
+  CFF2 定位純看 charstring 座標、無視 lsb；glyf 定位由 lsb 驅動（規範要求
+  `lsb == xMin`）。graft 刻意保留 JP base 的 lsb=43 當 pair-squeeze 訊號，轉 glyf
+  後就把置中的字拉回角落（43=lsb，361=xMin，差 318）。修法：`to_glyf.py` 轉換末段
+  將每個 glyph 的 `hmtx.lsb` 重新同步到 `xMin`。**pair-squeeze 實測無損失**（以文章
+  真實情境 Range 量測；`」，`/`》，`/`」。`/`。「` 照擠，`。」`/點對點本就不該擠）。
+  demo/fonts 與 og.png 已解除 rc.0 釘版、同步修好的字體。詳見
+  `docs/glyf-lsb-positioning-fix.md`。
+  遺留（後續）：`squeeze-matrix.html` harness 對 MOE 報出較低擠壓數，屬其全頁環境的
+  量測產物（非真實文章行為，已排除 trim 模式／span 包裹／fallback 三嫌疑）——改成
+  Range／正文情境量法列為後續改善。舊的「07-11 LSB-sync 量測筆記」作廢。
 
 - **File the Chromium bug.** `docs/chromium-bug-report-draft.md` has a
   ready-to-paste draft. Findings to land:
