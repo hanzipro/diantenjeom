@@ -74,6 +74,8 @@ jobs:
         run: npm version --no-git-tag-version --allow-same-version "${{ needs.build.outputs.version }}"
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        # dist/ is already built in the build job and downloaded above; skip the
+        # prepublishOnly hook (it reruns `pnpm run build`, and pnpm isn't here).
+        run: npm publish --provenance --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
