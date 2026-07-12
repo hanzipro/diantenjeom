@@ -42,6 +42,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: npm
+    permissions:
+      id-token: write   # required for `npm publish --provenance` (Sigstore OIDC)
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
