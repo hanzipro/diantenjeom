@@ -1,6 +1,6 @@
 {
   "name": "@hanzi.pro/diantenjeom",
-  "version": "0.1.0-rc.0",
+  "version": "0.1.0",
   "description": "Punctuation-only CJK fonts, per locale. Drop into a font fallback chain.",
   "keywords": [
     "cjk",
