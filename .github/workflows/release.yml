@@ -28,6 +28,17 @@ jobs:
       - name: Install build deps
         run: pip install -e .
 
+      # Upstream Noto CJK VF sources are gitignored and fetched on demand
+      # (pinned + SHA-256-verified). Cache keyed on the lockfile.
+      - name: Cache Noto CJK sources
+        uses: actions/cache@v4
+        with:
+          path: sources
+          key: noto-cjk-${{ hashFiles('sources/sources.lock.json') }}
+
+      - name: Fetch sources
+        run: python scripts/fetch_sources.py
+
       - name: Build fonts
         run: python scripts/build_fonts.py
 
