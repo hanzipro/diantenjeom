@@ -1,8 +1,11 @@
-<!-- diantenjeom favicon — an ideographic full stop 。 sitting in the CORNER of
-     its em square: punctuation POSITIONING is the whole product, and a hollow
-     ring has no glyph anatomy to get wrong. Same geometry language as the
-     sibling hanzi.pro marks (ink plate #191515, paper #f7f7f7). -->
+<!-- diantenjeom favicon (2a 直排起引號) — a vertical-writing opening quote
+     bracket ﹁ in the upper-right corner + an ideographic full stop 。 as a
+     hollow ring lower-left. Both are punctuation whose placement in the em
+     square is the whole product; hollow strokes have no glyph anatomy to get
+     wrong at 16px. Ink plate #191515 / paper #f7f7f7, same geometry language
+     as the sibling hanzi.pro marks. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="100" height="100" rx="18" fill="#191515"/>
-  <circle cx="34" cy="66" r="17" fill="none" stroke="#f7f7f7" stroke-width="11"/>
+  <path d="M52 22 H78 V48" fill="none" stroke="#f7f7f7" stroke-width="11"/>
+  <circle cx="34" cy="66" r="16" fill="none" stroke="#f7f7f7" stroke-width="11"/>
 </svg>
